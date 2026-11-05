@@ -1,61 +1,48 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  ChevronLeft, ChevronRight, Copy, ExternalLink, Maximize, Minimize, Pause, PictureInPicture2, Play, Power,
+  RotateCw, Star, Volume2, VolumeX, WifiOff,
+} from 'lucide-react';
 import { isBrowserPlayable, type Channel } from '../../shared/types.ts';
 import { youtubeEmbedUrl } from '../../shared/youtube.ts';
 import { copyText } from '../lib/clipboard.ts';
-import { diagnose, type Cause, type HlsErrorLike } from '../lib/diagnose.ts';
 import { categoryLabel, countryFlag, countryName } from '../lib/labels.ts';
-import { ChannelBadges, StatusDot } from './Badges.tsx';
+import { CAUSES, UNSUPPORTED, type UnsupportedWhy } from '../lib/messages.ts';
+import { getMuted, markSwipeHintSeen, setMuted as saveMuted, swipeHintSeen } from '../lib/prefs.ts';
+import { useMediaSession, useWakeLock } from '../lib/media.ts';
+import { ChannelBadges, StatusMark } from './Badges.tsx';
 import { ChannelLogo } from './ChannelLogo.tsx';
+import { HlsStage, type StageState } from './HlsStage.tsx';
+import { Mark } from './Mark.tsx';
+import type { Cause } from '../lib/diagnose.ts';
 
-type Phase = 'loading' | 'playing' | 'error';
+export interface Neighbor {
+  number: string;
+  name: string;
+}
+
+interface Props {
+  channel: Channel | null;
+  number: string;
+  /** Canal para retomar quando nada está sintonizado (último assistido). */
+  resume: { number: string; name: string } | null;
+  /** Já houve uma ação do usuário: pode carregar vídeo. */
+  armed: boolean;
+  onArm: () => void;
+  onPower: () => void;
+  online: boolean;
+  isFavorite: boolean;
+  onToggleFavorite: () => void;
+  onZap: (dir: 1 | -1) => void;
+  prev: Neighbor | null;
+  next: Neighbor | null;
+  suggestions: Channel[];
+  onPick: (c: Channel) => void;
+  onPlayingChange: (playing: boolean) => void;
+  digits: string;
+}
+
 type Mode = 'hls' | 'embed' | 'youtube-link' | 'unsupported';
-type UnsupportedWhy = 'http' | 'format' | 'cors' | 'headers';
-
-const CAUSES: Record<Cause, { title: string; text: string }> = {
-  offline: {
-    title: 'O canal parece estar fora do ar',
-    text: 'O servidor respondeu que o endereço não existe mais ou está com problemas. Transmissões gratuitas mudam de endereço com frequência.',
-  },
-  geo: {
-    title: 'Provável bloqueio geográfico',
-    text: 'O servidor recusou o acesso. Muitos canais só podem ser vistos dentro do país de origem.',
-  },
-  cors: {
-    title: 'Bloqueio do navegador (CORS) ou servidor inacessível',
-    text: 'O servidor não autoriza a reprodução dentro de outros sites ou não respondeu. O mesmo link costuma funcionar no VLC.',
-  },
-  media: {
-    title: 'Formato de vídeo não suportado',
-    text: 'O navegador não conseguiu decodificar o vídeo desta transmissão. Tente o VLC.',
-  },
-  timeout: {
-    title: 'O canal demorou demais para responder',
-    text: 'O servidor pode estar sobrecarregado, fora do ar ou bloqueando seu acesso.',
-  },
-  unknown: {
-    title: 'Não foi possível reproduzir este canal',
-    text: 'A transmissão falhou por um motivo que o navegador não detalhou. Pode estar offline ou bloqueada.',
-  },
-};
-
-const UNSUPPORTED: Record<UnsupportedWhy, { title: string; text: string }> = {
-  http: {
-    title: 'Canal em HTTP: o navegador bloqueia',
-    text: 'Este canal usa um endereço HTTP sem criptografia. Por segurança, o navegador não permite carregá-lo dentro de uma página HTTPS (conteúdo misto). Abra o link no VLC.',
-  },
-  format: {
-    title: 'Formato incompatível com o navegador',
-    text: 'Este link não é um fluxo HLS por HTTPS que o navegador consiga tocar. Abra o link no VLC.',
-  },
-  cors: {
-    title: 'O servidor não libera este canal para outros sites',
-    text: 'Nosso teste mostrou que o servidor não envia os cabeçalhos CORS necessários, então o navegador bloquearia a reprodução. No VLC costuma funcionar.',
-  },
-  headers: {
-    title: 'O canal exige cabeçalhos que o navegador não envia',
-    text: 'A origem pede um User-Agent ou Referer específico. Isso só é possível em players como o VLC.',
-  },
-};
 
 function pickMode(ch: Channel): { mode: Mode; why?: UnsupportedWhy } {
   if (ch.kind === 'youtube') return { mode: ch.youtube?.embeddable ? 'embed' : 'youtube-link' };
@@ -66,192 +53,257 @@ function pickMode(ch: Channel): { mode: Mode; why?: UnsupportedWhy } {
   return { mode: 'hls' };
 }
 
-interface Props {
-  channel: Channel;
-  isFavorite: boolean;
-  onToggleFavorite: () => void;
-  suggestions: Channel[];
-  onPick: (c: Channel) => void;
-}
+type FsVideo = HTMLVideoElement & {
+  webkitEnterFullscreen?: () => void;
+  webkitSetPresentationMode?: (m: string) => void;
+  webkitPresentationMode?: string;
+  webkitSupportsPresentationMode?: (m: string) => boolean;
+};
 
-export function Player({ channel, isFavorite, onToggleFavorite, suggestions, onPick }: Props) {
-  const { mode, why } = pickMode(channel);
-  const [forced, setForced] = useState(false);
-  const effectiveMode: Mode = forced ? 'hls' : mode;
+const SWIPE_MIN = 56;
+const EDGE = 24; // as bordas da tela pertencem aos gestos do sistema (voltar)
 
-  const containerRef = useRef<HTMLElement>(null);
+export function Player(props: Props) {
+  const { channel, armed, online, onArm, onZap, onPlayingChange } = props;
+  const wrapRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [phase, setPhase] = useState<Phase>('loading');
-  const [cause, setCause] = useState<Cause>('unknown');
-  const [detail, setDetail] = useState('');
+  const touchRef = useRef<{ x: number; y: number; t: number } | null>(null);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  const [state, setState] = useState<StageState>({ phase: 'loading' });
+  const [paused, setPaused] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [muted, setMutedState] = useState(() => getMuted());
+  const [forced, setForced] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [controlsOn, setControlsOn] = useState(true);
   const [isFull, setIsFull] = useState(false);
+  const [pipOn, setPipOn] = useState(false);
+  const [landscapeHint, setLandscapeHint] = useState(false);
+  const [swipeHint, setSwipeHint] = useState(() => !swipeHintSeen());
 
+  // Troca de canal: o mesmo elemento <video> e a mesma tela cheia continuam; só o estado do canal reinicia.
+  const channelId = channel ? `${channel.country}/${channel.id}` : '';
+  const [prevChannelId, setPrevChannelId] = useState(channelId);
+  if (prevChannelId !== channelId) {
+    setPrevChannelId(channelId);
+    setState({ phase: 'loading' });
+    setPaused(false);
+    setAttempt(0);
+    setForced(false);
+    setCopied(false);
+  }
+
+  const picked = channel ? pickMode(channel) : null;
+  const mode: Mode | null = channel ? (forced ? 'hls' : picked!.mode) : null;
+  const hlsActive = mode === 'hls' && armed && online;
+  const playing = hlsActive ? state.phase === 'playing' || state.phase === 'buffering' : mode === 'embed' && armed;
+
+  useEffect(() => onPlayingChange(playing && !paused), [playing, paused, onPlayingChange]);
+
+  useMediaSession(
+    channel && armed ? { title: channel.name, artist: 'TV Livre', logo: channel.logo } : null,
+    {
+      play: () => void videoRef.current?.play(),
+      pause: () => videoRef.current?.pause(),
+      previous: () => onZap(-1),
+      next: () => onZap(1),
+    },
+  );
+  useWakeLock(hlsActive && state.phase === 'playing' && !paused);
+
+  // ---- controles: mostrar/esconder ----
+  const poke = useCallback(() => {
+    setControlsOn(true);
+    clearTimeout(hideTimer.current);
+    hideTimer.current = setTimeout(() => setControlsOn(false), 3200);
+  }, []);
+  useEffect(() => () => clearTimeout(hideTimer.current), []);
+
+  // ---- tela cheia, PiP, orientação ----
   useEffect(() => {
-    if (effectiveMode !== 'hls') return;
-    const video = videoRef.current;
-    if (!video) return;
-    let disposed = false;
-    let hls: { destroy(): void } | null = null;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-
-    const fail = (c: Cause, d = '') => {
-      if (disposed) return;
-      clearTimeout(timer);
-      setCause(c);
-      setDetail(d);
-      setPhase('error');
-    };
-    const ready = () => {
-      if (disposed) return;
-      clearTimeout(timer);
-      setPhase('playing');
-    };
-    const tryPlay = () =>
-      video.play().catch((e: unknown) => {
-        // Autoplay bloqueado não é falha do canal: o usuário aperta play nos controles.
-        if ((e as { name?: string })?.name === 'NotAllowedError') ready();
-      });
-    const onNativeError = () => fail('media', `video.error ${video.error?.code ?? ''}`);
-
-    video.addEventListener('loadeddata', ready);
-    video.addEventListener('playing', ready);
-
-    (async () => {
-      let Hls: typeof import('hls.js').default;
-      try {
-        Hls = (await import('hls.js')).default;
-      } catch {
-        return fail('unknown', 'Não foi possível carregar o player (hls.js)');
-      }
-      if (disposed) return;
-      timer = setTimeout(() => fail('timeout'), 25_000);
-      if (Hls.isSupported()) {
-        const inst = new Hls({
-          manifestLoadingMaxRetry: 1,
-          levelLoadingMaxRetry: 1,
-          fragLoadingMaxRetry: 2,
-          manifestLoadingTimeOut: 15_000,
-        });
-        hls = inst;
-        inst.on(Hls.Events.ERROR, (_evt, data) => {
-          if (data.fatal) fail(diagnose(data as HlsErrorLike, channel), `${data.type} / ${data.details}`);
-        });
-        inst.on(Hls.Events.MANIFEST_PARSED, () => void tryPlay());
-        inst.loadSource(channel.url);
-        inst.attachMedia(video);
-      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        video.addEventListener('error', onNativeError);
-        video.src = channel.url;
-        void tryPlay();
-      } else {
-        fail('media', 'Este navegador não suporta HLS');
-      }
-    })();
-
-    return () => {
-      disposed = true;
-      clearTimeout(timer);
-      video.removeEventListener('loadeddata', ready);
-      video.removeEventListener('playing', ready);
-      video.removeEventListener('error', onNativeError);
-      hls?.destroy();
-      video.removeAttribute('src');
-      video.load();
-    };
-  }, [effectiveMode, channel, attempt]);
-
-  useEffect(() => {
-    const on = () => setIsFull(document.fullscreenElement === containerRef.current);
+    const on = () => setIsFull(document.fullscreenElement === wrapRef.current || (videoRef.current as FsVideo | null)?.webkitPresentationMode === 'fullscreen');
     document.addEventListener('fullscreenchange', on);
     return () => document.removeEventListener('fullscreenchange', on);
   }, []);
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    const on = () => setPipOn(document.pictureInPictureElement === v || (v as FsVideo).webkitPresentationMode === 'picture-in-picture');
+    v.addEventListener('enterpictureinpicture', on);
+    v.addEventListener('leavepictureinpicture', on);
+    return () => {
+      v.removeEventListener('enterpictureinpicture', on);
+      v.removeEventListener('leavepictureinpicture', on);
+    };
+  }, [mode, channel?.id]);
+  useEffect(() => {
+    const mq = window.matchMedia('(orientation: landscape)');
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const on = () => {
+      const phone = window.matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 600;
+      if (mq.matches && phone && playing && !document.fullscreenElement) {
+        setLandscapeHint(true);
+        clearTimeout(t);
+        t = setTimeout(() => setLandscapeHint(false), 6000);
+      } else setLandscapeHint(false);
+    };
+    mq.addEventListener('change', on);
+    return () => {
+      mq.removeEventListener('change', on);
+      clearTimeout(t);
+    };
+  }, [playing]);
 
-  const toggleFullscreen = useCallback(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    if (document.fullscreenElement) void document.exitFullscreen();
-    else if (el.requestFullscreen) void el.requestFullscreen();
-    else (videoRef.current as (HTMLVideoElement & { webkitEnterFullscreen?: () => void }) | null)?.webkitEnterFullscreen?.();
+  const toggleFullscreen = useCallback(async () => {
+    const el = wrapRef.current;
+    const v = videoRef.current as FsVideo | null;
+    setLandscapeHint(false);
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+        screen.orientation?.unlock?.();
+      } else if (el?.requestFullscreen) {
+        await el.requestFullscreen({ navigationUI: 'hide' });
+        (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.('landscape').catch(() => undefined);
+      } else if (v?.webkitEnterFullscreen) {
+        v.webkitEnterFullscreen(); // iPhone: só o <video> pode ir para tela cheia
+      }
+    } catch {
+      /* o navegador recusou: nada a fazer */
+    }
   }, []);
 
+  const pipSupported =
+    typeof document !== 'undefined' &&
+    (document.pictureInPictureEnabled === true || !!(document.createElement('video') as FsVideo).webkitSupportsPresentationMode?.('picture-in-picture'));
+  const togglePip = useCallback(async () => {
+    const v = videoRef.current as FsVideo | null;
+    if (!v) return;
+    try {
+      if (document.pictureInPictureElement) await document.exitPictureInPicture();
+      else if (v.requestPictureInPicture) await v.requestPictureInPicture();
+      else v.webkitSetPresentationMode?.(v.webkitPresentationMode === 'picture-in-picture' ? 'inline' : 'picture-in-picture');
+    } catch {
+      /* sem suporte para essa transmissão */
+    }
+  }, []);
+
+  const togglePlay = useCallback(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.paused) void v.play().catch(() => undefined);
+    else v.pause();
+  }, []);
+  const toggleMute = useCallback(() => {
+    setMutedState((m) => {
+      saveMuted(!m);
+      return !m;
+    });
+  }, []);
+
+  // atalhos de teclado que dependem do player chegam por eventos do documento (ver useShortcuts)
+  useEffect(() => {
+    const onCmd = (e: Event) => {
+      const cmd = (e as CustomEvent<string>).detail;
+      if (cmd === 'fullscreen') void toggleFullscreen();
+      else if (cmd === 'mute') toggleMute();
+      else if (cmd === 'pip') void togglePip();
+      else if (cmd === 'playpause') togglePlay();
+    };
+    document.addEventListener('tvlivre:cmd', onCmd);
+    return () => document.removeEventListener('tvlivre:cmd', onCmd);
+  }, [toggleFullscreen, toggleMute, togglePip, togglePlay]);
+
   const copyLink = useCallback(async () => {
+    if (!channel) return;
     const ok = await copyText(channel.url);
     setCopied(ok);
     if (ok) setTimeout(() => setCopied(false), 2500);
-  }, [channel.url]);
+  }, [channel]);
 
-  const retry = () => {
-    setPhase('loading');
-    setAttempt((n) => n + 1);
+  // ---- gestos: deslizar troca de canal; a rolagem vertical continua livre (touch-action: pan-y) ----
+  const onTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    if (!t || e.touches.length > 1) return (touchRef.current = null);
+    const w = window.innerWidth;
+    touchRef.current = t.clientX < EDGE || t.clientX > w - EDGE ? null : { x: t.clientX, y: t.clientY, t: Date.now() };
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const s = touchRef.current;
+    touchRef.current = null;
+    const t = e.changedTouches[0];
+    if (!s || !t) return;
+    const dx = t.clientX - s.x;
+    const dy = t.clientY - s.y;
+    if (Math.abs(dx) >= SWIPE_MIN && Math.abs(dx) > Math.abs(dy) * 1.6 && Date.now() - s.t < 700) {
+      if (swipeHint) {
+        markSwipeHintSeen();
+        setSwipeHint(false);
+      }
+      onZap(dx < 0 ? 1 : -1);
+    }
+  };
+  const onPointerUp = (e: React.PointerEvent) => {
+    if ((e.target as HTMLElement).closest('button, a, summary, details')) return;
+    if (e.pointerType === 'mouse') {
+      if (hlsActive && state.phase !== 'error') togglePlay();
+      poke();
+    } else if (e.pointerType === 'touch') {
+      if (controlsOn) setControlsOn(false);
+      else poke();
+    }
   };
 
-  const embedUrl = youtubeEmbedUrl(channel.youtube);
-  const ytWatch = channel.youtube?.id && channel.youtube.type === 'video' ? `https://www.youtube.com/watch?v=${channel.youtube.id}` : channel.url;
+  // ---------- sem canal: tela de ajuste ----------
+  if (!channel || !mode) {
+    return (
+      <div className="player">
+        <div className="stage stage-idle" data-phase="idle">
+          <TestCard />
+          <div className="idle-panel">
+            <p className="idle-kicker">Sem sinal</p>
+            <button type="button" className="btn btn-accent btn-xl" onClick={props.onPower}>
+              <Power size={22} aria-hidden="true" />
+              {props.resume ? `Voltar ao canal ${props.resume.number}` : 'Ligar a TV'}
+            </button>
+            {props.resume && <p className="idle-sub">{props.resume.name}</p>}
+            {!props.resume && <p className="idle-sub">Escolha um canal na grade ou aperte Zapear.</p>}
+          </div>
+          {props.digits && (
+            <div className="digits" role="status">
+              <span className="num">{props.digits}</span>
+              <small>Enter para sintonizar</small>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const why = forced ? undefined : picked!.why;
+  const embedUrl = armed ? youtubeEmbedUrl(channel.youtube) : null;
+  const showSpinner = hlsActive && (state.phase === 'loading' || state.phase === 'reconnecting' || state.phase === 'buffering');
+  const errorState = hlsActive && state.phase === 'error' ? state : null;
+  const phaseAttr = !online && mode === 'hls' ? 'offline' : mode !== 'hls' ? mode : !armed ? 'ready' : state.phase;
 
   return (
-    <section className="player" ref={containerRef} aria-label={`Player: ${channel.name}`}>
-      <header className="player-head">
-        <ChannelLogo name={channel.name} src={channel.logo} size={48} />
-        <div className="player-title">
-          <h2>{channel.name}</h2>
-          <p>
-            <span>
-              {countryFlag(channel.country)} {countryName(channel.country)}
-            </span>
-            {channel.categories[0] && <span>· {categoryLabel(channel.categories[0])}</span>}
-            <StatusDot status={channel.status} />
-            <ChannelBadges channel={channel} />
-          </p>
-        </div>
-        <div className="player-actions">
-          <button
-            type="button"
-            className={`icon-btn${isFavorite ? ' on' : ''}`}
-            onClick={onToggleFavorite}
-            aria-pressed={isFavorite}
-            aria-label={isFavorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
-            title={isFavorite ? 'Remover dos favoritos' : 'Favoritar'}
-          >
-            {isFavorite ? '♥' : '♡'}
-          </button>
-          <button type="button" className="icon-btn" onClick={toggleFullscreen} aria-label={isFull ? 'Sair da tela cheia' : 'Tela cheia'} title="Tela cheia">
-            {isFull ? '⤡' : '⛶'}
-          </button>
-        </div>
-      </header>
+    <div className="player" data-testid="player">
+      <div
+        className="stage"
+        ref={wrapRef}
+        data-phase={phaseAttr}
+        data-controls={controlsOn || paused || !!errorState || !armed ? 'on' : 'off'}
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+        onPointerUp={onPointerUp}
+        onPointerMove={(e) => e.pointerType === 'mouse' && hlsActive && poke()}
+        onFocus={() => poke()}
+        onDoubleClick={() => void toggleFullscreen()}
+      >
+        {mode === 'hls' && <HlsStage channel={channel} active={hlsActive} attempt={attempt} muted={muted} videoRef={videoRef} onState={setState} onPausedChange={setPaused} />}
 
-      <div className="stage" data-phase={effectiveMode === 'hls' ? phase : effectiveMode}>
-        {effectiveMode === 'hls' && (
-          <>
-            <video ref={videoRef} controls playsInline autoPlay onDoubleClick={toggleFullscreen} aria-label={`Vídeo de ${channel.name}`} />
-            {phase === 'loading' && (
-              <div className="overlay" role="status">
-                <span className="spinner" aria-hidden="true" />
-                Conectando ao canal…
-              </div>
-            )}
-            {phase === 'error' && (
-              <div className="overlay overlay-error" role="alert">
-                <h3>{CAUSES[cause].title}</h3>
-                <p>{CAUSES[cause].text}</p>
-                {detail && <p className="tech">Detalhe técnico: {detail}</p>}
-                <div className="btn-row">
-                  <button type="button" className="btn" onClick={retry}>
-                    Tentar novamente
-                  </button>
-                  <button type="button" className="btn btn-primary" onClick={copyLink}>
-                    {copied ? 'Link copiado!' : 'Copiar link para o VLC'}
-                  </button>
-                </div>
-                <Alternatives items={suggestions} onPick={onPick} />
-              </div>
-            )}
-          </>
-        )}
-
-        {effectiveMode === 'embed' && embedUrl && (
+        {mode === 'embed' && embedUrl && (
           <iframe
             title={`YouTube: ${channel.name}`}
             src={embedUrl}
@@ -261,73 +313,245 @@ export function Player({ channel, isFavorite, onToggleFavorite, suggestions, onP
           />
         )}
 
-        {effectiveMode === 'youtube-link' && (
-          <div className="overlay overlay-static">
-            <h3>Este canal do YouTube não pode ser incorporado</h3>
-            <p>O YouTube não permite exibir esta transmissão dentro de outros sites. Abra diretamente no YouTube.</p>
-            <div className="btn-row">
-              <a className="btn btn-primary" href={channel.url} target="_blank" rel="noopener noreferrer">
-                Abrir no YouTube ↗
-              </a>
-            </div>
-            <Alternatives items={suggestions} onPick={onPick} />
+        {/* canal sintonizado, ainda sem toque: pôster com o botão de tocar */}
+        {!armed && (mode === 'hls' || mode === 'embed') && (
+          <div className="poster">
+            <TestCard dim />
+            <button type="button" className="play-big" onClick={onArm} aria-label={`Tocar ${channel.name}`}>
+              <Play size={34} aria-hidden="true" fill="currentColor" />
+            </button>
           </div>
         )}
 
-        {effectiveMode === 'unsupported' && why && (
-          <div className="overlay overlay-static">
-            <h3>{UNSUPPORTED[why].title}</h3>
-            <p>{UNSUPPORTED[why].text}</p>
-            <div className="btn-row">
-              <button type="button" className="btn btn-primary" onClick={copyLink}>
-                {copied ? 'Link copiado!' : 'Copiar link para o VLC'}
-              </button>
-              {why === 'cors' && (
-                <button type="button" className="btn" onClick={() => setForced(true)}>
-                  Tentar mesmo assim
+        {!online && mode === 'hls' && armed && (
+          <Problem title={CAUSES.device.title} text={CAUSES.device.text} icon={<WifiOff size={22} aria-hidden="true" />} />
+        )}
+
+        {showSpinner && (
+          <div className="status-chip" role="status">
+            <span className="spinner" aria-hidden="true" />
+            {state.phase === 'reconnecting' ? 'Reconectando…' : state.phase === 'buffering' ? 'Carregando…' : 'Conectando ao canal…'}
+          </div>
+        )}
+
+        {errorState && online && (
+          <Problem
+            tone="error"
+            title={CAUSES[errorState.cause as Cause].title}
+            text={CAUSES[errorState.cause as Cause].text}
+            detail={errorState.detail}
+            actions={
+              <>
+                <button type="button" className="btn" onClick={() => { setState({ phase: 'loading' }); setAttempt((n) => n + 1); }}>
+                  <RotateCw size={18} aria-hidden="true" /> Tentar de novo
                 </button>
-              )}
-            </div>
-            <details className="vlc-help">
-              <summary>Como abrir no VLC</summary>
-              <ol>
-                <li>Copie o link com o botão acima.</li>
-                <li>No VLC, abra <b>Mídia → Abrir fluxo de rede</b> (Ctrl+N).</li>
-                <li>Cole o link e clique em <b>Reproduzir</b>.</li>
-              </ol>
-            </details>
-            <Alternatives items={suggestions} onPick={onPick} />
+                <button type="button" className="btn btn-accent" onClick={copyLink}>
+                  <Copy size={18} aria-hidden="true" /> {copied ? 'Link copiado' : 'Copiar link para o VLC'}
+                </button>
+              </>
+            }
+            suggestions={props.suggestions}
+            onPick={props.onPick}
+          />
+        )}
+
+        {mode === 'youtube-link' && (
+          <Problem
+            title="O YouTube não deixa tocar esse canal aqui"
+            text="Essa transmissão não pode ser exibida dentro de outros sites. Abra direto no YouTube."
+            actions={
+              <a className="btn btn-accent" href={channel.url} target="_blank" rel="noopener noreferrer">
+                <ExternalLink size={18} aria-hidden="true" /> Abrir no YouTube
+              </a>
+            }
+            suggestions={props.suggestions}
+            onPick={props.onPick}
+          />
+        )}
+
+        {mode === 'unsupported' && why && (
+          <Problem
+            title={UNSUPPORTED[why].title}
+            text={UNSUPPORTED[why].text}
+            actions={
+              <>
+                <button type="button" className="btn btn-accent" onClick={copyLink}>
+                  <Copy size={18} aria-hidden="true" /> {copied ? 'Link copiado' : 'Copiar link para o VLC'}
+                </button>
+                {why === 'cors' && (
+                  <button type="button" className="btn" onClick={() => setForced(true)}>
+                    Tentar mesmo assim
+                  </button>
+                )}
+              </>
+            }
+            extra={
+              <details className="vlc-help">
+                <summary>Como abrir no VLC</summary>
+                <ol>
+                  <li>Copie o link com o botão acima.</li>
+                  <li>No VLC, abra <b>Mídia → Abrir fluxo de rede</b> (Ctrl+N).</li>
+                  <li>Cole o link e toque em <b>Reproduzir</b>.</li>
+                </ol>
+              </details>
+            }
+            suggestions={props.suggestions}
+            onPick={props.onPick}
+          />
+        )}
+
+        {/* vinheta de troca: nasce a cada canal novo (key) e some sozinha por CSS */}
+        {armed && (
+          <div className="osd" key={channel.id} aria-hidden="true">
+            <span className="osd-num num">{props.number}</span>
+            <span className="osd-name">{channel.name}</span>
+          </div>
+        )}
+        <span className="sr-only" role="status" aria-live="polite">{armed ? `Canal ${props.number}, ${channel.name}` : ''}</span>
+
+        {props.digits && (
+          <div className="digits" role="status">
+            <span className="num">{props.digits}</span>
+            <small>Enter para sintonizar</small>
+          </div>
+        )}
+
+        {swipeHint && armed && playing && (
+          <div className="swipe-hint" aria-hidden="true">
+            <ChevronLeft size={18} /> deslize para trocar de canal <ChevronRight size={18} />
+          </div>
+        )}
+
+        {landscapeHint && (
+          <button type="button" className="landscape-hint btn btn-accent" onClick={() => void toggleFullscreen()}>
+            <Maximize size={18} aria-hidden="true" /> Tela cheia
+          </button>
+        )}
+
+        {(mode === 'hls' || mode === 'embed') && armed && (
+          <div className="controls">
+            {mode === 'hls' && (
+              <>
+                <button type="button" className="ctl" onClick={togglePlay} aria-label={paused ? 'Tocar' : 'Pausar'}>
+                  {paused ? <Play size={22} fill="currentColor" /> : <Pause size={22} fill="currentColor" />}
+                </button>
+                <button type="button" className="ctl" onClick={toggleMute} aria-pressed={muted} aria-label={muted ? 'Ativar o som' : 'Silenciar'}>
+                  {muted ? <VolumeX size={22} /> : <Volume2 size={22} />}
+                </button>
+              </>
+            )}
+            <span className="ctl-spacer" />
+            {mode === 'hls' && pipSupported && (
+              <button type="button" className="ctl" onClick={() => void togglePip()} aria-pressed={pipOn} aria-label="Imagem sobre imagem">
+                <PictureInPicture2 size={22} />
+              </button>
+            )}
+            <button type="button" className="ctl" onClick={() => void toggleFullscreen()} aria-label={isFull ? 'Sair da tela cheia' : 'Tela cheia'}>
+              {isFull ? <Minimize size={22} /> : <Maximize size={22} />}
+            </button>
           </div>
         )}
       </div>
 
-      {effectiveMode === 'embed' && (
-        <p className="player-foot">
-          O vídeo não aparece? <a href={ytWatch} target="_blank" rel="noopener noreferrer">Abrir no YouTube ↗</a>
-        </p>
-      )}
-      {effectiveMode === 'hls' && phase === 'playing' && !isBrowserPlayable(channel) && (
-        <p className="player-foot">Este canal tocou, mesmo com sinal de bloqueio. Pode ser instável.</p>
-      )}
-    </section>
+      <Dial {...props} channel={channel} onToggleFavorite={props.onToggleFavorite} />
+
+      <div className="now">
+        <span className="now-num num" aria-hidden="true">{props.number}</span>
+        <div className="now-body">
+          <h2>{channel.name}</h2>
+          <p className="now-meta">
+            <span>{countryFlagText(channel.country)}</span>
+            {channel.categories[0] && <span>{categoryLabel(channel.categories[0])}</span>}
+            <StatusMark status={channel.status} withText />
+            <ChannelBadges channel={channel} />
+          </p>
+          {mode === 'embed' && (
+            <p className="now-note">
+              O vídeo não aparece?{' '}
+              <a href={channel.youtube?.id && channel.youtube.type === 'video' ? `https://www.youtube.com/watch?v=${channel.youtube.id}` : channel.url} target="_blank" rel="noopener noreferrer">
+                Abrir no YouTube
+              </a>
+            </p>
+          )}
+          {mode === 'hls' && state.phase === 'playing' && !isBrowserPlayable(channel) && (
+            <p className="now-note">Tocou mesmo com sinal de bloqueio. Pode ficar instável.</p>
+          )}
+        </div>
+        <ChannelLogo name={channel.name} src={channel.logo} size={56} />
+      </div>
+    </div>
   );
 }
 
-function Alternatives({ items, onPick }: { items: Channel[]; onPick: (c: Channel) => void }) {
-  if (!items.length) return null;
+const countryFlagText = (c: string) => `${countryFlag(c)} ${countryName(c)}`.trim();
+
+function TestCard({ dim = false }: { dim?: boolean }) {
+  // tela de ajuste: barras em tons de papel e tinta, com uma única barra vermelha
+  const bars = ['#f1e9d8', '#d3c9b4', '#b0a692', '#8c8372', '#69614f', '#ff4b2b', '#3b342b', '#1e1914'];
   return (
-    <div className="alternatives">
-      <h4>Experimente outro canal</h4>
-      <ul>
-        {items.map((c) => (
-          <li key={c.id}>
-            <button type="button" onClick={() => onPick(c)}>
-              <ChannelLogo name={c.name} src={c.logo} size={28} />
-              <span>{c.name}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
+    <svg className={`testcard${dim ? ' dim' : ''}`} viewBox="0 0 80 45" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+      {bars.map((c, i) => (
+        <rect key={i} x={i * 10} y="0" width="10" height="45" fill={c} />
+      ))}
+    </svg>
+  );
+}
+
+interface ProblemProps {
+  title: string;
+  text: string;
+  detail?: string;
+  tone?: 'error';
+  icon?: React.ReactNode;
+  actions?: React.ReactNode;
+  extra?: React.ReactNode;
+  suggestions?: Channel[];
+  onPick?: (c: Channel) => void;
+}
+
+function Problem({ title, text, detail, tone, icon, actions, extra, suggestions, onPick }: ProblemProps) {
+  return (
+    <div className="problem" role={tone === 'error' ? 'alert' : undefined} data-testid="problem">
+      <Mark size={28} />
+      <h3>{icon} {title}</h3>
+      <p>{text}</p>
+      {detail && <p className="tech">Detalhe técnico: {detail}</p>}
+      {actions && <div className="btn-row">{actions}</div>}
+      {extra}
+      {!!suggestions?.length && onPick && (
+        <div className="alternatives">
+          <h4>Tente outro canal</h4>
+          <ul>
+            {suggestions.map((c) => (
+              <li key={c.id}>
+                <button type="button" onClick={() => onPick(c)}>{c.name}</button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Dial({ channel, number, prev, next, onZap, isFavorite, onToggleFavorite }: Props & { channel: Channel }) {
+  return (
+    <div className="dial" role="group" aria-label="Controle de canais">
+      <button type="button" className="dial-side" onClick={() => onZap(-1)} aria-label={prev ? `Canal anterior: ${prev.number} ${prev.name}` : 'Canal anterior'} disabled={!prev}>
+        <ChevronLeft size={22} aria-hidden="true" />
+        <span className="num">{prev?.number ?? ''}</span>
+      </button>
+      <div className="dial-now" aria-hidden="true">
+        <span className="num">{number}</span>
+        <span className="dial-name">{channel.name}</span>
+      </div>
+      <button type="button" className={`dial-fav${isFavorite ? ' on' : ''}`} onClick={onToggleFavorite} aria-pressed={isFavorite} aria-label={isFavorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'} title={isFavorite ? 'Remover dos favoritos' : 'Favoritar'}>
+        <Star size={22} fill={isFavorite ? 'currentColor' : 'none'} aria-hidden="true" />
+      </button>
+      <button type="button" className="dial-side" onClick={() => onZap(1)} aria-label={next ? `Próximo canal: ${next.number} ${next.name}` : 'Próximo canal'} disabled={!next}>
+        <span className="num">{next?.number ?? ''}</span>
+        <ChevronRight size={22} aria-hidden="true" />
+      </button>
     </div>
   );
 }

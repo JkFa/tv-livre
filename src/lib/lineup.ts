@@ -1,0 +1,61 @@
+import { isBrowserPlayable, type Channel } from '../../shared/types.ts';
+
+/**
+ * "Grade": cada país tem uma numeração estável de canais. A ordem não depende de filtros nem de status:
+ * canais curados do Free-TV primeiro, depois ordem alfabética. Só muda quando a lista de canais muda.
+ */
+export function lineupOrder(list: readonly Channel[]): Channel[] {
+  return [...list].sort(
+    (a, b) =>
+      Number(b.sources[0] === 'free-tv') - Number(a.sources[0] === 'free-tv') || a.name.localeCompare(b.name, 'pt-BR'),
+  );
+}
+
+export const channelKey = (c: Pick<Channel, 'id' | 'country'>): string => `${c.country}/${c.id}`;
+
+export function buildNumbers(store: Record<string, Channel[]>): Map<string, number> {
+  const numbers = new Map<string, number>();
+  for (const list of Object.values(store)) {
+    lineupOrder(list).forEach((c, i) => numbers.set(channelKey(c), i + 1));
+  }
+  return numbers;
+}
+
+export function formatNumber(n: number | undefined): string {
+  return n === undefined ? '--' : String(n).padStart(2, '0');
+}
+
+/**
+ * Próximo/anterior na lista visível, dando a volta nas pontas. Zapear prefere canais que tocam no navegador
+ * e nunca para em canal offline; se não houver nenhum assim, aceita os demais não-offline.
+ */
+export function stepChannel(list: readonly Channel[], currentKey: string | null, dir: 1 | -1): Channel | null {
+  if (!list.length) return null;
+  const start = currentKey ? list.findIndex((c) => channelKey(c) === currentKey) : -1;
+  const origin = start === -1 ? (dir === 1 ? -1 : 0) : start;
+  for (const strict of [true, false]) {
+    for (let i = 1; i <= list.length; i++) {
+      const c = list[(((origin + dir * i) % list.length) + list.length) % list.length];
+      if (!c || channelKey(c) === currentKey || c.status === 'offline') continue;
+      if (strict && !isBrowserPlayable(c)) continue;
+      return c;
+    }
+  }
+  return null;
+}
+
+/** Sorteia um canal no ar que toque no navegador; relaxa o critério se não houver nenhum. */
+export function pickShuffle(list: readonly Channel[], currentKey: string | null, rnd: () => number = Math.random): Channel | null {
+  const others = list.filter((c) => channelKey(c) !== currentKey);
+  const tiers = [
+    others.filter((c) => c.status === 'online' && isBrowserPlayable(c)),
+    others.filter((c) => c.status === 'online'),
+    others.filter((c) => c.status !== 'offline' && isBrowserPlayable(c)),
+  ];
+  const pool = tiers.find((t) => t.length > 0);
+  return pool ? (pool[Math.floor(rnd() * pool.length)] ?? null) : null;
+}
+
+export function findByNumber(list: readonly Channel[], numbers: Map<string, number>, n: number): Channel | null {
+  return list.find((c) => numbers.get(channelKey(c)) === n) ?? null;
+}

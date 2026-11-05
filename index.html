@@ -1,17 +1,68 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-theme="auto">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#0b0e14" />
-    <meta name="description" content="TV Livre: canais de TV aberta ao vivo de todo o mundo, direto no navegador. Sem cadastro, sem anúncios." />
-    <meta name="referrer" content="strict-origin-when-cross-origin" />
-    <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
     <title>TV Livre — TV aberta ao vivo</title>
+    <meta name="description" content="TV Livre: um controle remoto para a TV aberta pela internet. Canais do Brasil e do mundo ao vivo no navegador, com zapear, favoritos e app instalável. Sem cadastro e sem anúncios." />
+    <meta name="theme-color" content="#15110e" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://jkfa.github.io/tv-livre/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="TV Livre" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta property="og:title" content="TV Livre — o controle remoto da TV aberta" />
+    <meta property="og:description" content="Zapeie por milhares de canais ao vivo, direto no navegador. Sem cadastro, sem anúncios." />
+    <meta property="og:url" content="https://jkfa.github.io/tv-livre/" />
+    <meta property="og:image" content="https://jkfa.github.io/tv-livre/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Logotipo do TV Livre: uma moldura de tela com o canto aberto e uma luz vermelha, ao lado do número de canal 07." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="TV Livre — o controle remoto da TV aberta" />
+    <meta name="twitter:description" content="Zapeie por milhares de canais ao vivo, direto no navegador." />
+    <meta name="twitter:image" content="https://jkfa.github.io/tv-livre/og.png" />
+
+    <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="%BASE_URL%icons/favicon-32.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="%BASE_URL%icons/apple-touch-icon.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="TV Livre" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="apple-touch-startup-image" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="%BASE_URL%splash/splash-1290x2796.png" />
+    <link rel="apple-touch-startup-image" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="%BASE_URL%splash/splash-1179x2556.png" />
+    <link rel="apple-touch-startup-image" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="%BASE_URL%splash/splash-1170x2532.png" />
+    <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="%BASE_URL%splash/splash-1125x2436.png" />
+    <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="%BASE_URL%splash/splash-1242x2688.png" />
+    <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="%BASE_URL%splash/splash-828x1792.png" />
+    <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="%BASE_URL%splash/splash-750x1334.png" />
+    <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="%BASE_URL%splash/splash-1242x2208.png" />
+    <link rel="apple-touch-startup-image" media="(device-width: 810px) and (device-height: 1080px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="%BASE_URL%splash/splash-1620x2160.png" />
+    <link rel="apple-touch-startup-image" media="(device-width: 820px) and (device-height: 1180px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="%BASE_URL%splash/splash-1640x2360.png" />
+    <link rel="apple-touch-startup-image" media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="%BASE_URL%splash/splash-1668x2388.png" />
+    <link rel="apple-touch-startup-image" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="%BASE_URL%splash/splash-2048x2732.png" />
+    <link rel="apple-touch-startup-image" media="(device-width: 744px) and (device-height: 1133px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="%BASE_URL%splash/splash-1488x2266.png" />
+
+    <link rel="preload" href="/src/assets/fonts/archivo-latin-var.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/src/assets/fonts/atkinson-next-latin-var.woff2" as="font" type="font/woff2" crossorigin />
+    <script>
+      // aplica o tema salvo antes da primeira pintura (evita piscar claro/escuro)
+      try {
+        var t = localStorage.getItem('tvlivre:tema');
+        var r = document.documentElement;
+        r.dataset.theme = t === 'claro' ? 'light' : t === 'escuro' ? 'dark' : 'auto';
+        var dark = t === 'escuro' || (t !== 'claro' && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.querySelector('meta[name="theme-color"]').setAttribute('content', dark ? '#15110e' : '#efe6d2');
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>
-    <noscript>O TV Livre precisa de JavaScript para reproduzir os canais.</noscript>
+    <noscript>O TV Livre precisa de JavaScript para tocar os canais.</noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

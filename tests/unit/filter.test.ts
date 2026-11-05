@@ -74,6 +74,10 @@ describe('rotas por hash', () => {
   it('interpreta canal, sobre e home; ignora lixo', () => {
     expect(parseHash('#/canal/BR/Rede%20Globo.br')).toEqual({ name: 'channel', country: 'BR', id: 'Rede Globo.br' });
     expect(parseHash('#/sobre')).toEqual({ name: 'about' });
+    expect(parseHash('#/instalar')).toEqual({ name: 'install' });
+    expect(parseHash('#/zapear')).toEqual({ name: 'action', action: 'zap' });
+    expect(parseHash('#/favoritos')).toEqual({ name: 'action', action: 'favorites' });
+    expect(parseHash('#/buscar')).toEqual({ name: 'action', action: 'search' });
     expect(parseHash('')).toEqual({ name: 'home' });
     expect(parseHash('#/canal/BR')).toEqual({ name: 'home' });
     expect(parseHash('#/canal/%E0%A4%A/x')).toEqual({ name: 'home' });

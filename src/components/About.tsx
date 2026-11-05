@@ -1,67 +1,97 @@
-export function About() {
+import { useEffect, useState } from 'react';
+import { COUNTER_BASE, COUNTER_NS, readTotal } from '../lib/counter.ts';
+
+const nf = new Intl.NumberFormat('pt-BR');
+
+function VisitCounter({ initial }: { initial: number | null }) {
+  const [total, setTotal] = useState<number | null>(initial);
+  useEffect(() => {
+    if (initial !== null) return;
+    let alive = true;
+    void readTotal().then((n) => alive && setTotal(n));
+    return () => {
+      alive = false;
+    };
+  }, [initial]);
+  // Se o serviço falhar ou estivermos offline, o contador simplesmente não aparece.
+  if (total === null) return null;
   return (
-    <article className="about">
+    <p className="counter" data-testid="contador">
+      <span className="num">{nf.format(total)}</span>
+      <span>acessos ao site</span>
+    </p>
+  );
+}
+
+export function About({ visits }: { visits: number | null }) {
+  return (
+    <article className="doc">
       <h1>Sobre o TV Livre</h1>
       <p className="lead">
-        O TV Livre é um catálogo gratuito de canais de TV abertos que transmitem pela internet. Ele reúne links públicos,
-        mostra se estão no ar e toca direto no seu navegador sempre que possível.
+        Um controle remoto para a TV aberta que passa pela internet. O TV Livre reúne links públicos, mostra o que está no
+        ar e toca direto no seu navegador sempre que possível.
       </p>
+
+      <VisitCounter initial={visits} />
 
       <h2>Não hospedamos vídeo</h2>
       <p>
         Este site <strong>não hospeda, retransmite, grava nem passa por proxy nenhum vídeo</strong>. Quando você abre um
-        canal, o seu navegador se conecta diretamente à fonte original da transmissão (a emissora ou a plataforma que a
-        publica). O TV Livre apenas organiza os endereços, é um índice, como uma lista telefônica.
-      </p>
-      <p>
-        Não há anúncios, assinaturas, login nem rastreadores. Favoritos e últimos assistidos ficam apenas no
-        armazenamento local do seu navegador (nunca saem do seu dispositivo). Logos e vídeos são carregados dos servidores
-        de origem, que podem registrar o seu acesso, como em qualquer site.
+        canal, o seu navegador se conecta diretamente à fonte original da transmissão. O TV Livre só organiza os
+        endereços, como uma lista telefônica. Sem anúncios, sem assinatura, sem cobrança.
       </p>
 
       <h2>Fontes e créditos</h2>
       <ul>
         <li>
-          <a href="https://github.com/Free-TV/IPTV" target="_blank" rel="noopener noreferrer">Free-TV/IPTV</a> — playlist
+          <a href="https://github.com/Free-TV/IPTV" target="_blank" rel="noopener noreferrer">Free-TV/IPTV</a>: playlist
           curada de canais oficialmente gratuitos. Tem prioridade quando um canal aparece nas duas fontes. O repositório não
-          declara uma licença; usamos somente nomes e endereços públicos de transmissão, com crédito, e removemos qualquer
-          canal a pedido.
+          declara licença; usamos só nomes e endereços públicos de transmissão, com crédito, e removemos qualquer canal a
+          pedido.
         </li>
         <li>
-          <a href="https://github.com/iptv-org/iptv" target="_blank" rel="noopener noreferrer">iptv-org/iptv</a> — coleção
-          colaborativa de canais públicos e seu banco de metadados (países, categorias, idiomas, logos). Dados em domínio
+          <a href="https://github.com/iptv-org/iptv" target="_blank" rel="noopener noreferrer">iptv-org/iptv</a>: coleção
+          colaborativa de canais públicos e seu banco de metadados (países, categorias, idiomas, logos), em domínio
           público (Unlicense).
         </li>
       </ul>
-      <p>Obrigado às duas comunidades pelo trabalho de manter essas listas.</p>
+      <p>Obrigado às duas comunidades por manter essas listas.</p>
 
       <h2>Como funciona</h2>
       <ul>
-        <li>Todos os dias, e a cada alteração do site, um processo automático baixa as duas fontes, une os canais e remove duplicatas.</li>
+        <li>Todo dia, e a cada alteração do site, um processo automático baixa as duas fontes, une os canais e remove duplicatas.</li>
         <li>Canais adultos são excluídos pelos metadados das fontes, por categoria e por palavras-chave.</li>
         <li>Cada link é testado. Uma falha isolada <em>não</em> remove o canal: ele fica como “desconhecido” até falhar de forma repetida.</li>
-        <li>
-          O teste roda em servidores nos EUA, então canais com bloqueio geográfico podem aparecer como offline ou desconhecido
-          mesmo funcionando no Brasil.
-        </li>
+        <li>O teste roda em servidores nos EUA, então canais com bloqueio por região podem aparecer como offline ou desconhecido mesmo funcionando no Brasil.</li>
+        <li>O número de cada canal é a posição dele na grade do país. Muda só quando a lista muda.</li>
       </ul>
 
       <h2>Por que alguns canais não tocam?</h2>
       <ul>
-        <li><strong>Link HTTP:</strong> o navegador bloqueia vídeos sem criptografia dentro de páginas HTTPS. Copie o link e abra no VLC.</li>
+        <li><strong>Link HTTP:</strong> o navegador bloqueia vídeo sem criptografia dentro de páginas HTTPS. Copie o link e abra no VLC.</li>
         <li><strong>CORS:</strong> alguns servidores não deixam outros sites tocarem o vídeo. No VLC costuma funcionar.</li>
-        <li><strong>Bloqueio geográfico:</strong> parte dos canais só funciona no país de origem.</li>
-        <li><strong>Canal fora do ar:</strong> transmissões gratuitas mudam de endereço ou saem do ar sem aviso.</li>
+        <li><strong>Bloqueio por região:</strong> parte dos canais só funciona no país de origem.</li>
+        <li><strong>Fora do ar:</strong> transmissões gratuitas mudam de endereço ou saem do ar sem aviso.</li>
+      </ul>
+
+      <h2>Privacidade e contador de acessos</h2>
+      <ul>
+        <li>Favoritos, últimos assistidos, tema e país ficam só no armazenamento local do seu aparelho. Nada disso é enviado a ninguém.</li>
+        <li>Na grade não carregamos logos de terceiros; o logo só é baixado do servidor de origem quando você abre o canal.</li>
+        <li>
+          O contador de acessos usa o serviço gratuito{' '}
+          <a href={COUNTER_BASE} target="_blank" rel="noopener noreferrer">Abacus</a>. Conta no máximo uma visita por sessão,
+          sem cookies e sem dados pessoais: o serviço recebe apenas o nome do contador (<code>{COUNTER_NS}</code>). O número
+          mostrado é o valor devolvido pelo serviço; se ele estiver fora do ar, o contador some.
+        </li>
+        <li>O app instalado guarda uma cópia da estrutura do site e da lista de canais para abrir offline. Nunca guarda vídeo.</li>
       </ul>
 
       <h2>Pedir a remoção de um canal</h2>
       <p>
         Se você é responsável por um canal ou detentor de direitos e quer que ele saia do TV Livre, abra uma{' '}
-        <a href="https://github.com/JkFa/tv-livre/issues/new?template=remocao-de-canal.yml" target="_blank" rel="noopener noreferrer">
-          solicitação de remoção
-        </a>{' '}
-        informando o nome do canal e o link. O canal é adicionado a uma lista de exclusão e deixa de aparecer na próxima
-        atualização.
+        <a href="https://github.com/JkFa/tv-livre/issues/new?template=remocao-de-canal.yml" target="_blank" rel="noopener noreferrer">solicitação de remoção</a>{' '}
+        com o nome do canal e o link. O canal entra em uma lista de exclusão e some na próxima atualização.
       </p>
       <p>
         Como o TV Livre só aponta para a transmissão original, a remoção definitiva do conteúdo depende de quem o publica.
@@ -73,8 +103,9 @@ export function About() {
 
       <h2>Código</h2>
       <p>
-        O projeto é aberto:{' '}
+        Projeto aberto:{' '}
         <a href="https://github.com/JkFa/tv-livre" target="_blank" rel="noopener noreferrer">github.com/JkFa/tv-livre</a>.
+        Fontes tipográficas: Archivo e Atkinson Hyperlegible Next (licença OFL).
       </p>
     </article>
   );

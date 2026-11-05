@@ -1,40 +1,59 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { Star } from 'lucide-react';
 import type { Channel } from '../../shared/types.ts';
-import { categoryLabel, countryFlag } from '../lib/labels.ts';
-import { ChannelBadges, StatusDot } from './Badges.tsx';
-import { ChannelLogo } from './ChannelLogo.tsx';
+import { categoryLabel, countryName } from '../lib/labels.ts';
+import { channelKey, formatNumber } from '../lib/lineup.ts';
+import { ChannelBadges, StatusMark } from './Badges.tsx';
 
 interface Props {
   channels: Channel[];
-  selectedId: string | null;
+  numbers: Map<string, number>;
+  selectedKey: string | null;
   showCountry: boolean;
   isFavorite: (c: Channel) => boolean;
   onToggleFavorite: (c: Channel) => void;
   onSelect: (c: Channel) => void;
-  empty: string;
+  /** Conteúdo exibido quando a lista está vazia (mensagem + ações). */
+  empty: React.ReactNode;
+  loading: boolean;
 }
 
-const ROW_HEIGHT = 68;
+const ROW_HEIGHT = 60;
 
-/** Lista virtualizada: só as linhas visíveis existem no DOM, mesmo com milhares de canais. */
-export function ChannelList({ channels, selectedId, showCountry, isFavorite, onToggleFavorite, onSelect, empty }: Props) {
+/**
+ * A "grade" de canais: uma tabela tipográfica. O número de grade é o elemento gráfico; o canal sintonizado
+ * ganha o bloco de número preenchido com o acento. Virtualizada: só as linhas visíveis existem no DOM.
+ */
+export function ChannelList({ channels, numbers, selectedKey, showCountry, isFavorite, onToggleFavorite, onSelect, empty, loading }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line react-hooks/incompatible-library -- API do TanStack Virtual; o componente é simples e não depende de memoização
+  // eslint-disable-next-line react-hooks/incompatible-library -- API do TanStack Virtual; o componente não depende de memoização
   const virtualizer = useVirtualizer({
     count: channels.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => ROW_HEIGHT,
-    overscan: 10,
+    overscan: 8,
   });
 
-  if (!channels.length) {
+  // volta ao topo quando a lista muda de conteúdo (busca/filtro/aba)
+  const firstKey = channels[0] ? channelKey(channels[0]) : '';
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0 });
+  }, [firstKey, channels.length]);
+
+  if (loading && !channels.length) {
     return (
-      <div className="list-empty" role="status">
-        {empty}
+      <div className="list-scroll" aria-busy="true" aria-label="Carregando canais">
+        {Array.from({ length: 9 }, (_, i) => (
+          <div className="row row-skeleton" key={i} style={{ top: i * ROW_HEIGHT, height: ROW_HEIGHT }}>
+            <span className="sk sk-num" />
+            <span className="sk sk-name" style={{ width: `${48 + ((i * 17) % 38)}%` }} />
+          </div>
+        ))}
       </div>
     );
   }
+  if (!channels.length) return <div className="list-empty" role="status">{empty}</div>;
 
   return (
     <div className="list-scroll" ref={scrollRef} data-testid="channel-list">
@@ -42,34 +61,37 @@ export function ChannelList({ channels, selectedId, showCountry, isFavorite, onT
         {virtualizer.getVirtualItems().map((v) => {
           const ch = channels[v.index];
           if (!ch) return null;
+          const key = channelKey(ch);
           const fav = isFavorite(ch);
+          const selected = selectedKey === key;
           return (
             <li
-              key={`${ch.country}/${ch.id}`}
-              className={`row${selectedId === ch.id ? ' selected' : ''}`}
+              key={key}
+              className={`row${selected ? ' selected' : ''}${ch.status === 'offline' ? ' is-off' : ''}`}
               style={{ height: v.size, transform: `translateY(${v.start}px)` }}
               data-testid="channel-row"
             >
-              <button type="button" className="row-main" onClick={() => onSelect(ch)} aria-current={selectedId === ch.id ? 'true' : undefined}>
-                <ChannelLogo name={ch.name} src={ch.logo} />
+              <button type="button" className="row-main" onClick={() => onSelect(ch)} aria-current={selected ? 'true' : undefined}>
+                <span className="row-num num" aria-hidden="true">{formatNumber(numbers.get(key))}</span>
                 <span className="row-text">
                   <span className="row-name">{ch.name}</span>
                   <span className="row-meta">
-                    <StatusDot status={ch.status} />
-                    {showCountry && <span>{countryFlag(ch.country)}</span>}
-                    {ch.categories[0] && <span className="row-cat">{categoryLabel(ch.categories[0])}</span>}
+                    <StatusMark status={ch.status} />
+                    <span className="row-sub">
+                      {[showCountry ? countryName(ch.country) : '', ch.categories[0] ? categoryLabel(ch.categories[0]) : ''].filter(Boolean).join(' · ')}
+                    </span>
                     <ChannelBadges channel={ch} />
                   </span>
                 </span>
               </button>
               <button
                 type="button"
-                className={`icon-btn fav${fav ? ' on' : ''}`}
+                className={`fav${fav ? ' on' : ''}`}
                 aria-pressed={fav}
                 aria-label={fav ? `Remover ${ch.name} dos favoritos` : `Favoritar ${ch.name}`}
                 onClick={() => onToggleFavorite(ch)}
               >
-                {fav ? '♥' : '♡'}
+                <Star size={20} fill={fav ? 'currentColor' : 'none'} aria-hidden="true" />
               </button>
             </li>
           );

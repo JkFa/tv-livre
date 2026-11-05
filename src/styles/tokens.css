@@ -1,0 +1,89 @@
+/* ===== Tokens do TV Livre — ver DESIGN.md ===== */
+@font-face {
+  font-family: 'Archivo TV';
+  src: url('../assets/fonts/archivo-latin-var.woff2') format('woff2');
+  font-weight: 100 900;
+  font-stretch: 62% 125%;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Atkinson TV';
+  src: url('../assets/fonts/atkinson-next-latin-var.woff2') format('woff2');
+  font-weight: 200 800;
+  font-display: swap;
+}
+/* Fallbacks com métricas ajustadas para não haver salto de layout na troca de fonte */
+@font-face {
+  font-family: 'Archivo TV Fallback';
+  src: local('Arial');
+  size-adjust: 97%;
+  ascent-override: 88%;
+  descent-override: 22%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: 'Atkinson TV Fallback';
+  src: local('Arial');
+  size-adjust: 103%;
+  ascent-override: 92%;
+  descent-override: 24%;
+  line-gap-override: 0%;
+}
+
+:root {
+  --font-display: 'Archivo TV', 'Archivo TV Fallback', 'Arial Narrow', Arial, sans-serif;
+  --font-text: 'Atkinson TV', 'Atkinson TV Fallback', system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
+
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px; --s-6: 24px; --s-7: 32px; --s-8: 48px;
+  --r-s: 4px;
+  --r-m: 10px;
+  --tap: 48px;
+
+  --ease-in: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-out: cubic-bezier(0.4, 0, 1, 1);
+  --t-micro: 120ms;
+  --t-short: 160ms;
+  --t-page: 240ms;
+
+  --accent: #ff4b2b;
+  --on-accent: #15110e;
+  --screen: #000;
+
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+
+  /* escuro é o padrão */
+  --bg: #15110e;
+  --surface: #1e1914;
+  --raised: #2a241d;
+  --rule: #3b342b;
+  --text: #f1e9d8;
+  --muted: #a79e8e;
+  --accent-text: #ff4b2b;
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  --bg: #efe6d2;
+  --surface: #f6efdf;
+  --raised: #e5dac0;
+  --rule: #cbbd9f;
+  --text: #1b1612;
+  --muted: #5f574a;
+  --accent-text: #b5290c;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: light) {
+  :root[data-theme='auto'] {
+    --bg: #efe6d2;
+    --surface: #f6efdf;
+    --raised: #e5dac0;
+    --rule: #cbbd9f;
+    --text: #1b1612;
+    --muted: #5f574a;
+    --accent-text: #b5290c;
+    color-scheme: light;
+  }
+}
