@@ -50,6 +50,16 @@ export async function openChannel(page: Page, name: string) {
   await expect(page).toHaveTitle(new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 }
 
+/**
+ * Sintoniza por link direto e toca: a lista continua inteira (sem filtro de busca), então o canal tem vizinhos
+ * para o anterior/próximo, o que não pode depender de quantos canais batem com o nome nos dados do dia.
+ */
+export async function tuneByLink(page: Page, ch: Pick<Channel, 'id' | 'name'>) {
+  await page.goto(`./#/canal/BR/${encodeURIComponent(ch.id)}`);
+  await page.getByRole('button', { name: /^Tocar / }).click();
+  await expect(page).toHaveTitle(new RegExp(ch.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+}
+
 /** Simula um deslizar horizontal sobre o elemento (eventos de toque sintéticos: funcionam em todos os motores). */
 export async function swipe(page: Page, selector: string, dx: number, startXRatio = 0.5) {
   await page.evaluate(

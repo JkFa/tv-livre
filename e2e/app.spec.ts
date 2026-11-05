@@ -1,5 +1,5 @@
 import type { Channel } from '../shared/types.ts';
-import { brChannels, COUNTER_VALUE, deadStream, expect, openChannel, playableHls, search, searchBox, stalledStream, swipe, test } from './fixtures.ts';
+import { brChannels, COUNTER_VALUE, deadStream, expect, openChannel, playableHls, search, searchBox, stalledStream, swipe, test, tuneByLink } from './fixtures.ts';
 
 // Roda tanto contra o build local (vite preview) quanto contra o site publicado (BASE_URL).
 
@@ -85,7 +85,7 @@ test('trocar de canal: botões do dial e vinheta com número e nome', async ({ p
   const br = await brChannels(request);
   const target = br.find(playableHls)!;
   await page.route('**/*.m3u8*', stalledStream); // conectando: a vinheta aparece sobre o vídeo
-  await openChannel(page, target.name);
+  await tuneByLink(page, target);
 
   const before = await page.title();
   await page.getByRole('button', { name: /^Próximo canal:/ }).click();
@@ -102,7 +102,7 @@ test('atalhos do teclado: setas trocam de canal, / busca, ? lista os atalhos, M 
   const br = await brChannels(request);
   const target = br.find(playableHls)!;
   await page.route('**/*.m3u8*', deadStream);
-  await openChannel(page, target.name);
+  await tuneByLink(page, target);
   await page.locator('body').click({ position: { x: 5, y: 5 } });
 
   const t0 = await page.title();
@@ -161,7 +161,7 @@ test('deslizar no player troca de canal (gesto horizontal), mas ignora as bordas
   const br = await brChannels(request);
   const target = br.find(playableHls)!;
   await page.route('**/*.m3u8*', deadStream);
-  await openChannel(page, target.name);
+  await tuneByLink(page, target);
 
   const t0 = await page.title();
   await swipe(page, '.stage', -140, 0.02); // começou na borda do sistema: ignorado
