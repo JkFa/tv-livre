@@ -1,4 +1,5 @@
-import { isBrowserPlayable, type Channel } from '../../shared/types.ts';
+import type { Channel } from '../../shared/types.ts';
+import { caps, isPlayableHere } from './playback.ts';
 
 /**
  * "Grade": cada país tem uma numeração estável de canais. A ordem não depende de filtros nem de status:
@@ -37,7 +38,7 @@ export function stepChannel(list: readonly Channel[], currentKey: string | null,
     for (let i = 1; i <= list.length; i++) {
       const c = list[(((origin + dir * i) % list.length) + list.length) % list.length];
       if (!c || channelKey(c) === currentKey || c.status === 'offline') continue;
-      if (strict && !isBrowserPlayable(c)) continue;
+      if (strict && !isPlayableHere(c, caps())) continue;
       return c;
     }
   }
@@ -48,9 +49,9 @@ export function stepChannel(list: readonly Channel[], currentKey: string | null,
 export function pickShuffle(list: readonly Channel[], currentKey: string | null, rnd: () => number = Math.random): Channel | null {
   const others = list.filter((c) => channelKey(c) !== currentKey);
   const tiers = [
-    others.filter((c) => c.status === 'online' && isBrowserPlayable(c)),
+    others.filter((c) => c.status === 'online' && isPlayableHere(c, caps())),
     others.filter((c) => c.status === 'online'),
-    others.filter((c) => c.status !== 'offline' && isBrowserPlayable(c)),
+    others.filter((c) => c.status !== 'offline' && isPlayableHere(c, caps())),
   ];
   const pool = tiers.find((t) => t.length > 0);
   return pool ? (pool[Math.floor(rnd() * pool.length)] ?? null) : null;

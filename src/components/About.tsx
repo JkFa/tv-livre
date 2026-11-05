@@ -68,8 +68,8 @@ export function About({ visits }: { visits: number | null }) {
 
       <h2>Por que alguns canais não tocam?</h2>
       <ul>
-        <li><strong>Link HTTP:</strong> o navegador bloqueia vídeo sem criptografia dentro de páginas HTTPS. Copie o link e abra no VLC.</li>
-        <li><strong>CORS:</strong> alguns servidores não deixam outros sites tocarem o vídeo. No VLC costuma funcionar.</li>
+        <li><strong>Link HTTP:</strong> o navegador bloqueia vídeo sem criptografia dentro de páginas HTTPS. O site tenta o mesmo endereço por HTTPS sozinho; se não houver, no computador (Chrome, Edge, Brave) você pode liberar &ldquo;Conteúdo não seguro&rdquo; só para este site, e no celular o botão <b>Abrir no VLC</b> abre o canal direto, sem copiar nada.</li>
+        <li><strong>CORS:</strong> alguns servidores não deixam outros sites tocarem o vídeo. Onde o navegador toca HLS sozinho (Chrome, Edge, Safari, celulares) o site usa isso e o canal toca; nos demais, o VLC costuma funcionar.</li>
         <li><strong>Bloqueio por região:</strong> parte dos canais só funciona no país de origem.</li>
         <li><strong>Fora do ar:</strong> transmissões gratuitas mudam de endereço ou saem do ar sem aviso.</li>
       </ul>

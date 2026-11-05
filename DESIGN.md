@@ -68,6 +68,7 @@ Ambas OFL, autohospedadas, subset latino, `font-display: swap` com fallback ajus
 | **Navegação inferior** | Canais · Favoritos · **Zapear** (central, acento) · Buscar · Mais. Só abaixo de 960 px. |
 | **Folha (`Sheet`)** | `<dialog>` nativo (foco preso, Esc, fundo inerte) ancorada embaixo. Filtros, menu "Mais", atalhos. |
 | **Chips de filtro** | Retângulos de canto pequeno, removíveis, com "Limpar tudo". |
+| **Painel de HTTP bloqueado** | Mensagem curta no player (título, 1 frase, 2 botões); o passo a passo vive numa folha `modal` para não estourar o 16:9. Ação principal: *Liberar HTTP* (computador Chromium) ou *Abrir no VLC* (demais). |
 | **Avisos** | Offline (faixa fixa), atualização (barra com "Atualizar"), instalação (botão discreto). |
 | **Ícones** | Um único conjunto (Lucide), traço 2 px, terminações e juntas **retas** (a mesma geometria de uma tecla), 24 px. |
 

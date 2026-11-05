@@ -1,18 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ChevronLeft, ChevronRight, Copy, ExternalLink, Maximize, Minimize, Pause, PictureInPicture2, Play, Power,
-  RotateCw, Star, Volume2, VolumeX, WifiOff,
+  ChevronLeft, ChevronRight, Download, ExternalLink, Maximize, Minimize, Pause, PictureInPicture2, Play, Power,
+  RotateCw, ShieldCheck, Star, Volume2, VolumeX, WifiOff,
 } from 'lucide-react';
-import { isBrowserPlayable, type Channel } from '../../shared/types.ts';
+import type { Channel } from '../../shared/types.ts';
 import { youtubeEmbedUrl } from '../../shared/youtube.ts';
 import { copyText } from '../lib/clipboard.ts';
 import { categoryLabel, countryFlag, countryName } from '../lib/labels.ts';
 import { CAUSES, UNSUPPORTED, type UnsupportedWhy } from '../lib/messages.ts';
 import { getMuted, markSwipeHintSeen, setMuted as saveMuted, swipeHintSeen } from '../lib/prefs.ts';
+import { caps, isPlayableHere, unsupportedReason } from '../lib/playback.ts';
+import { canAllowInsecure, downloadM3u, platform, siteSettingsAddress, vlcHref } from '../lib/vlc.ts';
 import { useMediaSession, useWakeLock } from '../lib/media.ts';
 import { ChannelBadges, StatusMark } from './Badges.tsx';
 import { ChannelLogo } from './ChannelLogo.tsx';
 import { HlsStage, type StageState } from './HlsStage.tsx';
+import { Sheet } from './Sheet.tsx';
 import { Mark } from './Mark.tsx';
 import type { Cause } from '../lib/diagnose.ts';
 
@@ -46,11 +49,9 @@ type Mode = 'hls' | 'embed' | 'youtube-link' | 'unsupported';
 
 function pickMode(ch: Channel): { mode: Mode; why?: UnsupportedWhy } {
   if (ch.kind === 'youtube') return { mode: ch.youtube?.embeddable ? 'embed' : 'youtube-link' };
-  if (ch.kind === 'http') return { mode: 'unsupported', why: 'http' };
-  if (ch.kind === 'other') return { mode: 'unsupported', why: 'format' };
-  if (ch.needsHeaders) return { mode: 'unsupported', why: 'headers' };
-  if (ch.cors === false) return { mode: 'unsupported', why: 'cors' };
-  return { mode: 'hls' };
+  // HTTP, falta de CORS etc. não são mais "não toca": o HlsStage tenta HTTPS, HLS nativo e HTTP em sequência.
+  const why = unsupportedReason(ch, caps());
+  return why ? { mode: 'unsupported', why } : { mode: 'hls' };
 }
 
 type FsVideo = HTMLVideoElement & {
@@ -76,6 +77,7 @@ export function Player(props: Props) {
   const [muted, setMutedState] = useState(() => getMuted());
   const [forced, setForced] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [howOpen, setHowOpen] = useState(false);
   const [controlsOn, setControlsOn] = useState(true);
   const [isFull, setIsFull] = useState(false);
   const [pipOn, setPipOn] = useState(false);
@@ -301,7 +303,7 @@ export function Player(props: Props) {
         onFocus={() => poke()}
         onDoubleClick={() => void toggleFullscreen()}
       >
-        {mode === 'hls' && <HlsStage channel={channel} active={hlsActive} attempt={attempt} muted={muted} videoRef={videoRef} onState={setState} onPausedChange={setPaused} />}
+        {mode === 'hls' && <HlsStage channel={channel} force={forced} active={hlsActive} attempt={attempt} muted={muted} videoRef={videoRef} onState={setState} onPausedChange={setPaused} />}
 
         {mode === 'embed' && embedUrl && (
           <iframe
@@ -334,7 +336,19 @@ export function Player(props: Props) {
           </div>
         )}
 
-        {errorState && online && (
+        {errorState && online && errorState.cause === 'mixed' && (
+          <HttpPanel
+            channel={channel}
+            copied={copied}
+            onCopy={copyLink}
+            onRetry={() => { setState({ phase: 'loading' }); setAttempt((n) => n + 1); }}
+            onHow={() => setHowOpen(true)}
+            suggestions={props.suggestions}
+            onPick={props.onPick}
+          />
+        )}
+
+        {errorState && online && errorState.cause !== 'mixed' && (
           <Problem
             tone="error"
             title={CAUSES[errorState.cause as Cause].title}
@@ -342,14 +356,13 @@ export function Player(props: Props) {
             detail={errorState.detail}
             actions={
               <>
+                <VlcOpen channel={channel} />
                 <button type="button" className="btn" onClick={() => { setState({ phase: 'loading' }); setAttempt((n) => n + 1); }}>
                   <RotateCw size={18} aria-hidden="true" /> Tentar de novo
                 </button>
-                <button type="button" className="btn btn-accent" onClick={copyLink}>
-                  <Copy size={18} aria-hidden="true" /> {copied ? 'Link copiado' : 'Copiar link para o VLC'}
-                </button>
               </>
             }
+            extra={<CopyLine copied={copied} onCopy={copyLink} />}
             suggestions={props.suggestions}
             onPick={props.onPick}
           />
@@ -375,26 +388,15 @@ export function Player(props: Props) {
             text={UNSUPPORTED[why].text}
             actions={
               <>
-                <button type="button" className="btn btn-accent" onClick={copyLink}>
-                  <Copy size={18} aria-hidden="true" /> {copied ? 'Link copiado' : 'Copiar link para o VLC'}
-                </button>
-                {why === 'cors' && (
+                <VlcOpen channel={channel} />
+                {(why === 'cors' || why === 'headers') && (
                   <button type="button" className="btn" onClick={() => setForced(true)}>
                     Tentar mesmo assim
                   </button>
                 )}
               </>
             }
-            extra={
-              <details className="vlc-help">
-                <summary>Como abrir no VLC</summary>
-                <ol>
-                  <li>Copie o link com o botão acima.</li>
-                  <li>No VLC, abra <b>Mídia → Abrir fluxo de rede</b> (Ctrl+N).</li>
-                  <li>Cole o link e toque em <b>Reproduzir</b>.</li>
-                </ol>
-              </details>
-            }
+            extra={<CopyLine copied={copied} onCopy={copyLink} />}
             suggestions={props.suggestions}
             onPick={props.onPick}
           />
@@ -473,12 +475,13 @@ export function Player(props: Props) {
               </a>
             </p>
           )}
-          {mode === 'hls' && state.phase === 'playing' && !isBrowserPlayable(channel) && (
+          {mode === 'hls' && state.phase === 'playing' && !isPlayableHere(channel, caps()) && (
             <p className="now-note">Tocou mesmo com sinal de bloqueio. Pode ficar instável.</p>
           )}
         </div>
         <ChannelLogo name={channel.name} src={channel.logo} size={56} />
       </div>
+      <HttpSheet open={howOpen} onClose={() => setHowOpen(false)} />
     </div>
   );
 }
@@ -494,6 +497,135 @@ function TestCard({ dim = false }: { dim?: boolean }) {
         <rect key={i} x={i * 10} y="0" width="10" height="45" fill={c} />
       ))}
     </svg>
+  );
+}
+
+/** Abre o canal no VLC sem copiar nada: celular por link direto; computador por um .m3u de um clique. */
+function VlcOpen({ channel, variant = 'accent' }: { channel: Channel; variant?: 'accent' | 'plain' }) {
+  const href = vlcHref(channel);
+  const cls = variant === 'accent' ? 'btn btn-accent' : 'btn';
+  if (href) {
+    return (
+      <a className={cls} href={href} data-testid="vlc-open">
+        <ExternalLink size={18} aria-hidden="true" /> Abrir no VLC
+      </a>
+    );
+  }
+  return (
+    <button type="button" className={cls} onClick={() => downloadM3u(channel)} data-testid="vlc-open">
+      <Download size={18} aria-hidden="true" /> Abrir no VLC
+    </button>
+  );
+}
+
+/** Caminho manual, para quem prefere colar o link ou não tem o app configurado. */
+function CopyLine({ copied, onCopy }: { copied: boolean; onCopy: () => void }) {
+  return (
+    <p className="vlc-alt">
+      Prefere colar no VLC?{' '}
+      <button type="button" className="link-btn" onClick={onCopy}>
+        {copied ? 'Link copiado' : 'Copiar link'}
+      </button>
+      {platform() === 'desktop' && ' · O botão acima baixa um arquivo .m3u; abra-o com o VLC.'}
+    </p>
+  );
+}
+
+interface HttpPanelProps {
+  channel: Channel;
+  copied: boolean;
+  onCopy: () => void;
+  onRetry: () => void;
+  onHow: () => void;
+  suggestions: Channel[];
+  onPick: (c: Channel) => void;
+}
+
+/**
+ * O canal só transmite em HTTP e o navegador bloqueia (conteúdo misto). O site não consegue liberar isso sozinho;
+ * só o usuário, nas configurações do site, e só em navegadores de computador baseados em Chromium.
+ */
+function HttpPanel({ channel, copied, onCopy, onRetry, onHow, suggestions, onPick }: HttpPanelProps) {
+  const canAllow = canAllowInsecure();
+  return (
+    <Problem
+      title={CAUSES.mixed.title}
+      text={
+        canAllow
+          ? 'O navegador bloqueia esse tipo de link. Libere uma vez para o TV Livre e ele toca aqui, ou abra no VLC.'
+          : 'O navegador bloqueia esse tipo de link e não tem opção para liberar. O VLC abre o canal direto, sem copiar nada.'
+      }
+      icon={<ShieldCheck size={22} aria-hidden="true" />}
+      actions={
+        canAllow ? (
+          <>
+            <button type="button" className="btn btn-accent" onClick={onHow} data-testid="http-how">
+              <ShieldCheck size={18} aria-hidden="true" /> Liberar HTTP
+            </button>
+            <VlcOpen channel={channel} variant="plain" />
+          </>
+        ) : (
+          <>
+            <VlcOpen channel={channel} />
+            <button type="button" className="btn" onClick={onRetry}>
+              <RotateCw size={18} aria-hidden="true" /> Tentar de novo
+            </button>
+          </>
+        )
+      }
+      extra={<CopyLine copied={copied} onCopy={onCopy} />}
+      suggestions={suggestions}
+      onPick={onPick}
+    />
+  );
+}
+
+/** Passo a passo para permitir "Conteúdo não seguro" só para este site (Chrome, Edge, Brave, Opera no computador). */
+function HttpSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [copiedAddr, setCopiedAddr] = useState(false);
+  const addr = siteSettingsAddress();
+  const copyAddr = async () => {
+    if (!addr) return;
+    const ok = await copyText(addr);
+    setCopiedAddr(ok);
+    if (ok) setTimeout(() => setCopiedAddr(false), 2500);
+  };
+  return (
+    <Sheet
+      id="liberar-http"
+      open={open}
+      onClose={onClose}
+      title="Liberar canais em HTTP"
+      variant="modal"
+      footer={
+        <button type="button" className="btn btn-accent" onClick={() => window.location.reload()} data-testid="http-reload">
+          <RotateCw size={18} aria-hidden="true" /> Já liberei, recarregar
+        </button>
+      }
+    >
+      <div className="howto" data-testid="http-steps">
+        <p>O navegador só deixa um site seguro tocar vídeo sem criptografia se você permitir. São 15 segundos, uma vez só:</p>
+        <ol>
+          <li>Clique no ícone à esquerda do endereço, na barra do navegador (cadeado ou controles).</li>
+          <li>Abra <b>Configurações do site</b>.</li>
+          <li>Em <b>Conteúdo não seguro</b>, escolha <b>Permitir</b>.</li>
+          <li>Volte aqui e toque em <b>Já liberei, recarregar</b>. O canal volta sozinho.</li>
+        </ol>
+        {addr && (
+          <p>
+            Atalho: cole <code>{addr}</code> na barra de endereço{' '}
+            <button type="button" className="link-btn" onClick={copyAddr}>
+              {copiedAddr ? 'Copiado' : 'Copiar atalho'}
+            </button>
+          </p>
+        )}
+        <p className="howto-note">
+          Vale só para este site e dá para desfazer no mesmo lugar. O vídeo desses canais trafega sem criptografia, então
+          quem controla a sua rede consegue ver o que você assiste. Se preferir não liberar, o botão <b>Abrir no VLC</b> serve
+          para qualquer canal.
+        </p>
+      </div>
+    </Sheet>
   );
 }
 

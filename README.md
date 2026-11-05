@@ -32,7 +32,7 @@ Detalhes, tokens e regras de movimento em [DESIGN.md](DESIGN.md).
 | Plataforma | Picture-in-Picture, Media Session (tela de bloqueio e teclas de mídia trocam de canal) e Wake Lock (tela ligada enquanto toca). |
 | Resiliência | Autoplay só após uma ação do usuário; se o navegador bloquear, a interface continua. Queda de rede ou volta do segundo plano retomam o canal (até 3 tentativas), pulando para o ao vivo. |
 | Retomada | Lembra o último canal (`tvlivre:ultimo`) e oferece "Voltar ao canal NN" ao abrir. |
-| Erros | Explica a causa provável (fora do ar, bloqueio por região, CORS, formato, sem internet), oferece tentar de novo, copiar o link para o VLC e sugere outros canais. |
+| Erros | Explica a causa provável (fora do ar, bloqueio por região, CORS, formato, sem internet), oferece tentar de novo, **Abrir no VLC** com um toque (sem copiar link) e sugere outros canais. |
 
 ## Instalar como aplicativo (PWA)
 
@@ -65,6 +65,22 @@ testar de verdade a partir da origem `https://jkfa.github.io`: o CounterAPI v2 e
 - Limitação inerente: o contador é um endereço público; qualquer pessoa pode chamá-lo. O número é uma contagem de visitas
   sem verificação, não uma métrica auditada.
 
+## Como o player escolhe como tocar
+
+`src/lib/playback.ts` monta, para cada canal, uma lista de tentativas que o `HlsStage` executa em ordem:
+
+| Canal | Tentativas |
+|---|---|
+| HTTPS com CORS | hls.js → HLS nativo (se o hls.js falhar sem resposta do servidor) |
+| HTTPS sem CORS | HLS nativo (o `<video>` não precisa de CORS) |
+| HTTP, página HTTPS | 1) mesmo endereço por **HTTPS** (hls.js reescrevendo lista e trechos; depois nativo) · 2) **HTTP direto**, que só passa se o usuário liberou "Conteúdo não seguro" |
+| Nada tocou | painel com a causa real e **Abrir no VLC** |
+
+- Resposta real do servidor (404, 403) ou lentidão no endereço original encerram a sequência: outro motor não resolve.
+- Quando o HTTP direto toca, o site lembra (`tvlivre:http-liberado`) e passa a tentar o HTTP primeiro; esses canais entram no zapear.
+- O site **não consegue pedir a permissão por código**: não existe API para isso. Ele detecta o bloqueio (HTTP + página HTTPS + falha sem resposta do servidor) e mostra o passo a passo, com o atalho `chrome://settings/content/siteDetails?site=…` para copiar.
+- Sem proxy e sem hospedar vídeo: tudo acontece entre o navegador do usuário e o servidor do canal.
+
 ## Como os dados são tratados
 
 | Etapa | O que acontece |
@@ -73,7 +89,7 @@ testar de verdade a partir da origem `https://jkfa.github.io`: o CounterAPI v2 e
 | Normalização | Parser M3U tolerante a entradas malformadas; nomes sem acentos/qualidade; `UK` e `GB` unificados. |
 | Duplicatas | Por URL (http/https tratados como iguais) e por *nome normalizado + país*. **Free-TV tem prioridade**; a origem de cada canal fica em `sources`. |
 | Adultos | Excluídos por `is_nsfw`, categoria `xxx`, blocklist do iptv-org, URLs de canais adultos e palavras-chave. |
-| Tipo do link | `hls` (HTTPS reproduzível), `youtube`, `http` (bloqueado pelo navegador) ou `other`. |
+| Tipo do link | `hls` (HTTPS reproduzível), `youtube`, `http` (o site tenta HTTPS e, se o usuário liberou, HTTP puro) ou `other`. |
 | Status | `online`, `offline` ou `desconhecido` (no app: *No ar*, *Fora do ar*, *Não confirmado*). **Uma falha isolada nunca remove nem derruba um canal.** |
 | Saída | `public/data/index.json` (leve) + `public/data/countries/<PAÍS>.json` + `health.json`. A página só baixa o índice e o país escolhido. |
 
@@ -164,10 +180,9 @@ aponta para transmissões publicadas por eles.
 
 ## Limitações
 
-- **Link HTTP** não toca no navegador (conteúdo misto em página HTTPS): o site oferece copiar o link para abrir no **VLC**.
-- **CORS:** servidores que não liberam outros sites impedem a reprodução; esses canais são sinalizados ("Só no VLC").
-- **Bloqueio geográfico:** muitos canais só funcionam no país de origem. O teste automático roda nos EUA, então o status pode
-  divergir do que você vê no Brasil.
+- **Link HTTP** é bloqueado pelo navegador numa página HTTPS (conteúdo misto) e **nenhum site consegue liberar isso sozinho**. O player faz o que é possível, nesta ordem e sem o usuário escolher nada (ver "Como o player escolhe como tocar"): HTTPS no mesmo endereço, HTTP direto se o usuário já liberou. Quando nada disso toca, o painel explica e oferece **Abrir no VLC** (celular: link direto; computador: arquivo `.m3u` de um clique).
+- **Liberar HTTP** só existe no Chrome, Edge, Brave e Opera **de computador** (Configurações do site → Conteúdo não seguro → Permitir). Chrome/Edge/Firefox no celular, Safari e iPhone não têm essa opção; lá, canais que só existem em HTTP abrem pelo VLC.
+- **CORS:** servidores sem CORS não deixam o hls.js ler o vídeo, mas o `<video>` com HLS nativo (Chrome, Edge e Safari recentes, Android, iPhone) toca sem CORS, então o site usa isso. Só Firefox e navegadores sem HLS nativo ficam com "Só no VLC".
 - **Canais exigindo cabeçalhos** (User-Agent/Referer) só funcionam em players como o VLC.
 - **YouTube:** só vídeos e `channel/UC…` têm embed; links `@handle` abrem no YouTube. O embed não permite PiP próprio nem Media Session.
 - **iOS:** instalação só pelo Safari; no iPhone a tela cheia usa o player nativo; as telas de abertura cobrem iPhone e iPad em retrato.

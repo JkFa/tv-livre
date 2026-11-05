@@ -1,4 +1,5 @@
-import { isBrowserPlayable, type Channel, type Status } from '../../shared/types.ts';
+import type { Channel, Status } from '../../shared/types.ts';
+import { caps, isPlayableHere } from './playback.ts';
 
 export interface Filters {
   query: string;
@@ -49,7 +50,7 @@ export function filterChannels(list: readonly Channel[], f: Filters): Channel[] 
     if (f.status && ch.status !== f.status) continue;
     if (f.category && !ch.categories.includes(f.category)) continue;
     if (f.language && !ch.languages.includes(f.language)) continue;
-    if (f.playableOnly && !isBrowserPlayable(ch)) continue;
+    if (f.playableOnly && !isPlayableHere(ch, caps())) continue;
     let score = 0;
     if (tokens.length) {
       const key = searchKey(ch);
@@ -68,7 +69,7 @@ export function filterChannels(list: readonly Channel[], f: Filters): Channel[] 
  */
 export function suggestAlternatives(current: Channel, pool: readonly Channel[], limit = 4): Channel[] {
   const candidates = pool.filter(
-    (c) => c.id !== current.id && c.country === current.country && c.status !== 'offline' && isBrowserPlayable(c),
+    (c) => c.id !== current.id && c.country === current.country && c.status !== 'offline' && isPlayableHere(c, caps()),
   );
   const rank = (c: Channel) =>
     (c.status === 'online' ? 0 : 2) + (c.categories.some((x) => current.categories.includes(x)) ? 0 : 1);

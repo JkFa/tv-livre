@@ -77,7 +77,7 @@ test('sintonizar mostra o canal; tocar com a rede falhando explica a causa e sug
   await expect(alert).toBeVisible({ timeout: 40_000 });
   await expect(alert.getByRole('heading', { level: 3 })).toContainText(/saiu do ar/i);
   await expect(alert.getByRole('button', { name: 'Tentar de novo' })).toBeVisible();
-  await expect(alert.getByRole('button', { name: /Copiar link para o VLC/ })).toBeVisible();
+  await expect(alert.getByTestId('vlc-open')).toBeVisible(); // "Abrir no VLC": sem copiar e colar
   await expect(page.getByRole('button', { name: /Tela cheia/ })).toBeVisible();
 });
 
@@ -175,15 +175,47 @@ test('deslizar no player troca de canal (gesto horizontal), mas ignora as bordas
   await expect.poll(() => page.title()).not.toBe(t1);
 });
 
-test('canal HTTP é sinalizado e oferece copiar o link para o VLC', async ({ page, context, request }) => {
+test('canal HTTP que não toca oferece abrir no VLC com um toque, sem copiar link', async ({ page, context, request }, info) => {
   const br = await brChannels(request);
   const target = br.find((c) => c.kind === 'http');
   test.skip(!target, 'sem canal HTTP no Brasil nos dados atuais');
   await context.grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => undefined);
+  await page.route(target!.url, (route) => route.abort('failed')); // servidor inalcançável (no site publicado o navegador nem tenta: conteúdo misto)
   await openChannel(page, target!.name);
-  await expect(page.getByText('Canal em HTTP: o navegador não deixa tocar')).toBeVisible();
-  await page.getByRole('button', { name: /Copiar link para o VLC/ }).click();
+  const open = page.getByTestId('vlc-open');
+  await expect(open).toBeVisible({ timeout: 60_000 });
+
+  if (info.project.name === 'android') {
+    // Android: intent direto para o app do VLC
+    await expect(open).toHaveAttribute('href', /^intent:\/\/.*package=org\.videolan\.vlc/);
+  } else if (info.project.name === 'iphone') {
+    await expect(open).toHaveAttribute('href', /^vlc-x-callback:\/\/x-callback-url\/stream\?url=/);
+  } else {
+    // computador: baixa um .m3u de um canal, que o VLC abre com dois cliques
+    const [download] = await Promise.all([page.waitForEvent('download'), open.click()]);
+    expect(download.suggestedFilename()).toMatch(/\.m3u$/);
+  }
+  // o caminho manual continua existindo
+  await page.getByRole('button', { name: 'Copiar link' }).click();
   await expect(page.getByRole('button', { name: 'Link copiado' })).toBeVisible();
+});
+
+test('HTTP bloqueado no navegador de computador: o passo a passo para liberar abre numa folha', async ({ page, request }, info) => {
+  test.skip(info.project.name !== 'chromium-desktop', 'a opção "Conteúdo não seguro" só existe no Chromium de computador');
+  const br = await brChannels(request);
+  const target = br.find((c) => c.kind === 'http');
+  test.skip(!target, 'sem canal HTTP no Brasil nos dados atuais');
+  // Só numa página HTTPS o bloqueio de conteúdo misto existe; no preview local (http) o teste simula a mesma falha.
+  await page.route(target!.url, (route) => route.abort('failed'));
+  await page.route(target!.url.replace(/^http:/, 'https:'), (route) => route.abort('failed'));
+  await openChannel(page, target!.name);
+  const how = page.getByTestId('http-how');
+  if (!(await how.isVisible({ timeout: 60_000 }).catch(() => false))) {
+    test.skip(!page.url().startsWith('https:'), 'no preview local o HTTP não é conteúdo misto');
+  }
+  await how.click();
+  await expect(page.getByTestId('http-steps')).toContainText('Conteúdo não seguro');
+  await expect(page.getByTestId('http-reload')).toBeVisible();
 });
 
 test('YouTube incorporável usa o embed oficial (nocookie)', async ({ page, request }) => {

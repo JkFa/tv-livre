@@ -1,6 +1,6 @@
 import type { Cause } from './diagnose.ts';
 
-export type UnsupportedWhy = 'http' | 'format' | 'cors' | 'headers';
+export type UnsupportedWhy = 'format' | 'cors' | 'headers';
 
 export const CAUSES: Record<Cause, { title: string; text: string }> = {
   offline: {
@@ -23,6 +23,10 @@ export const CAUSES: Record<Cause, { title: string; text: string }> = {
     title: 'O canal demorou demais para responder',
     text: 'O servidor pode estar sobrecarregado, fora do ar ou bloqueando seu acesso.',
   },
+  mixed: {
+    title: 'Esse canal só transmite em HTTP',
+    text: 'O navegador bloqueia vídeo sem criptografia dentro de uma página segura.',
+  },
   device: {
     title: 'Você está sem internet',
     text: 'Sem conexão não dá para assistir. Seus favoritos continuam aqui; volte quando a rede voltar.',
@@ -34,17 +38,13 @@ export const CAUSES: Record<Cause, { title: string; text: string }> = {
 };
 
 export const UNSUPPORTED: Record<UnsupportedWhy, { title: string; text: string }> = {
-  http: {
-    title: 'Canal em HTTP: o navegador não deixa tocar',
-    text: 'Esse endereço não usa HTTPS, e o navegador bloqueia vídeo sem criptografia dentro de uma página segura. Copie o link e abra no VLC.',
-  },
   format: {
     title: 'Formato que o navegador não entende',
-    text: 'Esse link não é um HLS por HTTPS que dê para tocar aqui. Copie o link e abra no VLC.',
+    text: 'Esse link não é um HLS que o navegador consiga tocar. O VLC abre esse tipo de transmissão.',
   },
   cors: {
     title: 'O servidor não libera esse canal para outros sites',
-    text: 'Nosso teste mostrou que o servidor não envia os cabeçalhos CORS, então o navegador bloquearia o vídeo. No VLC costuma funcionar.',
+    text: 'Nosso teste mostrou que o servidor não envia os cabeçalhos CORS e este navegador não toca HLS sozinho. No VLC costuma funcionar.',
   },
   headers: {
     title: 'O canal pede cabeçalhos que o navegador não envia',

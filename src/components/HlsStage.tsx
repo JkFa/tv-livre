@@ -1,6 +1,8 @@
 import { useEffect, useRef, type RefObject } from 'react';
+import type { HlsConfig, LoaderCallbacks, LoaderConfiguration, LoaderContext } from 'hls.js';
 import type { Channel } from '../../shared/types.ts';
 import { diagnose, type Cause, type HlsErrorLike } from '../lib/diagnose.ts';
+import { buildPlan, caps as readCaps, isHttpUrl, setHttpOk, toHttps, type Step } from '../lib/playback.ts';
 
 export type StageState =
   | { phase: 'loading' }
@@ -10,7 +12,9 @@ export type StageState =
   | { phase: 'error'; cause: Cause; detail: string };
 
 interface Props {
-  channel: Pick<Channel, 'url' | 'status' | 'geo'>;
+  channel: Pick<Channel, 'url' | 'status' | 'geo' | 'cors' | 'needsHeaders'>;
+  /** "Tentar mesmo assim": tenta o hls.js mesmo com o aviso de CORS. */
+  force?: boolean;
   /** Só carrega o vídeo depois de uma ação do usuário (ou quando o app já foi "ligado"). */
   active: boolean;
   /** Incrementa para tentar de novo. */
@@ -21,18 +25,18 @@ interface Props {
   onPausedChange: (paused: boolean) => void;
 }
 
-const LOAD_TIMEOUT_MS = 25_000;
 const MAX_RECONNECTS = 3;
 
 type HlsInstance = import('hls.js').default;
 
 /**
- * Motor de reprodução HLS:
- *  - hls.js onde há MediaSource; HLS nativo (<video src>) no Safari do iPhone e similares;
+ * Motor de reprodução HLS. Executa o plano de `lib/playback.ts`, uma tentativa depois da outra, sem o usuário ver:
+ *  - hls.js onde há MediaSource; HLS nativo (<video src>) quando o servidor não manda CORS ou o hls.js não dá conta;
+ *  - canal em HTTP: primeiro o mesmo endereço por HTTPS, depois HTTP direto (que só passa se o usuário liberou);
  *  - autoplay bloqueado não quebra a interface (o vídeo fica pausado e o usuário aperta play);
  *  - cai/volta a rede, ou o app volta do segundo plano → retoma sozinho.
  */
-export function HlsStage({ channel, active, attempt, muted, videoRef, onState, onPausedChange }: Props) {
+export function HlsStage({ channel, force = false, active, attempt, muted, videoRef, onState, onPausedChange }: Props) {
   const cb = useRef({ onState, onPausedChange, channel });
   useEffect(() => {
     cb.current = { onState, onPausedChange, channel };
@@ -45,6 +49,8 @@ export function HlsStage({ channel, active, attempt, muted, videoRef, onState, o
   }, [muted, videoRef]);
 
   const url = channel.url;
+  const cors = channel.cors;
+  const needsHeaders = channel.needsHeaders;
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !active) return;
@@ -58,25 +64,51 @@ export function HlsStage({ channel, active, attempt, muted, videoRef, onState, o
     let started = false;
     let reconnects = 0;
     let mediaRecovered = false;
-    let native = false;
     let wasPlayingBeforeHide = false;
+    let steps: Step[] = [];
+    let stepIdx = 0;
+    const capsNow = readCaps();
 
+    const step = (): Step | undefined => steps[stepIdx];
     const emit = (s: StageState) => {
       if (!disposed) cb.current.onState(s);
     };
+
+    /** Falhas sem resposta do servidor, num canal HTTP dentro de página HTTPS, são o bloqueio de conteúdo misto. */
+    const finalCause = (cause: Cause): Cause => {
+      const ch = cb.current.channel;
+      const blockedLike = cause === 'cors' || cause === 'media' || cause === 'unknown';
+      if (isHttpUrl(url) && capsNow.pageSecure && !capsNow.httpOk && blockedLike) {
+        return ch.status === 'offline' ? 'offline' : 'mixed';
+      }
+      return cause;
+    };
+
     const fail = (cause: Cause, detail = '') => {
+      if (disposed) return;
       clearTimeout(loadTimer);
       clearTimeout(bufferTimer);
-      if (!disposed) {
-        hls?.stopLoad();
-        emit({ phase: 'error', cause, detail });
+      const cur = step();
+      // Resposta real do servidor (404, 403…) ou lentidão no endereço original não melhora com outro motor.
+      const stop = cause === 'device' || (!cur?.upgrade && (cause === 'offline' || cause === 'geo' || cause === 'timeout'));
+      if (!started && !stop && stepIdx + 1 < steps.length) {
+        stepIdx++;
+        reconnects = 0;
+        teardown();
+        init();
+        return;
       }
+      hls?.stopLoad();
+      const final = started ? cause : finalCause(cause);
+      if (final === 'mixed') setHttpOk(false);
+      emit({ phase: 'error', cause: final, detail });
     };
     const ready = () => {
       clearTimeout(loadTimer);
       clearTimeout(bufferTimer);
       started = true;
       reconnects = 0;
+      if (step()?.insecure) setHttpOk(true); // HTTP puro tocou: o usuário liberou; lembramos para ir direto da próxima vez
       emit({ phase: 'playing' });
     };
     const tryPlay = () =>
@@ -88,6 +120,8 @@ export function HlsStage({ channel, active, attempt, muted, videoRef, onState, o
     const teardown = () => {
       hls?.destroy();
       hls = null;
+      video.removeAttribute('src');
+      video.load();
     };
 
     const reconnect = (why: string) => {
@@ -110,25 +144,24 @@ export function HlsStage({ channel, active, attempt, muted, videoRef, onState, o
     const onPlaying = () => ready();
     const onPlay = () => cb.current.onPausedChange(false);
     const onPause = () => cb.current.onPausedChange(true);
-    const onNativeError = () => (started ? reconnect('erro do vídeo') : fail('media', `video.error ${video.error?.code ?? ''}`));
+    // Só o HLS nativo usa o erro do <video> como falha de rede; no hls.js, quem trata é o próprio hls.js.
+    const onVideoError = () => {
+      if (step()?.engine !== 'native') return;
+      if (started) reconnect('erro do vídeo');
+      else fail('media', `video.error ${video.error?.code ?? ''}`);
+    };
 
     video.addEventListener('waiting', onWaiting);
     video.addEventListener('playing', onPlaying);
     video.addEventListener('loadeddata', ready);
     video.addEventListener('play', onPlay);
     video.addEventListener('pause', onPause);
+    video.addEventListener('error', onVideoError);
 
-    const init = () => {
-      if (disposed) return;
-      clearTimeout(loadTimer);
-      loadTimer = setTimeout(() => fail('timeout'), LOAD_TIMEOUT_MS);
-      if (native) {
-        video.src = url;
-        void tryPlay();
-        return;
-      }
-      if (!HlsCtor) return;
-      const inst = new HlsCtor({
+    const startHls = (s: Step) => {
+      if (!HlsCtor) return fail('unknown', 'hls.js indisponível');
+      const Ctor = HlsCtor;
+      const cfg: Partial<HlsConfig> = {
         manifestLoadingMaxRetry: 1,
         levelLoadingMaxRetry: 1,
         fragLoadingMaxRetry: 2,
@@ -136,9 +169,20 @@ export function HlsStage({ channel, active, attempt, muted, videoRef, onState, o
         // reduz consumo em 4G: começa pela qualidade mais baixa que caiba na banda
         startLevel: -1,
         capLevelToPlayerSize: true,
-      });
+      };
+      if (s.upgrade) {
+        // lista e trechos: qualquer endereço http: dentro da lista passa a https:
+        const Base = Ctor.DefaultConfig.loader;
+        cfg.loader = class UpgradeLoader extends Base {
+          load(context: LoaderContext, config: LoaderConfiguration, callbacks: LoaderCallbacks<LoaderContext>) {
+            context.url = toHttps(context.url);
+            super.load(context, config, callbacks);
+          }
+        };
+      }
+      const inst = new Ctor(cfg);
       hls = inst;
-      inst.on(HlsCtor.Events.ERROR, (_e, data) => {
+      inst.on(Ctor.Events.ERROR, (_e, data) => {
         if (!data.fatal) return;
         const d = data as HlsErrorLike;
         if (!navigator.onLine) return started ? reconnect('sem internet') : fail('device', `${data.type} / ${data.details}`);
@@ -152,26 +196,38 @@ export function HlsStage({ channel, active, attempt, muted, videoRef, onState, o
         }
         fail(diagnose(d, cb.current.channel), `${data.type} / ${data.details}`);
       });
-      inst.on(HlsCtor.Events.MANIFEST_PARSED, () => void tryPlay());
-      inst.loadSource(url);
+      inst.on(Ctor.Events.MANIFEST_PARSED, () => void tryPlay());
+      inst.loadSource(s.url);
       inst.attachMedia(video);
+    };
+
+    const init = () => {
+      const s = step();
+      if (disposed) return;
+      if (!s) return fail('cors', 'sem forma de tocar neste navegador');
+      clearTimeout(loadTimer);
+      loadTimer = setTimeout(() => fail('timeout'), s.budgetMs);
+      if (s.engine === 'native') {
+        video.src = s.url;
+        void tryPlay();
+        return;
+      }
+      startHls(s);
     };
 
     emit({ phase: 'loading' });
     (async () => {
+      let mse: boolean;
       try {
         const mod = await import('hls.js');
         HlsCtor = mod.default;
+        mse = HlsCtor.isSupported();
       } catch {
-        return fail('unknown', 'Não foi possível carregar o player (hls.js)');
+        mse = false; // sem hls.js ainda dá para tentar o HLS nativo
       }
       if (disposed) return;
-      if (!HlsCtor.isSupported() && video.canPlayType('application/vnd.apple.mpegurl')) {
-        native = true;
-        video.addEventListener('error', onNativeError);
-      } else if (!HlsCtor.isSupported()) {
-        return fail('media', 'Este navegador não suporta HLS');
-      }
+      steps = buildPlan({ url, cors, needsHeaders: force ? false : needsHeaders }, { ...capsNow, mse }, { force });
+      if (!steps.length) return fail(mse ? 'cors' : 'media', mse ? 'sem forma de tocar neste canal' : 'Este navegador não suporta HLS');
       init();
     })();
 
@@ -208,12 +264,10 @@ export function HlsStage({ channel, active, attempt, muted, videoRef, onState, o
       video.removeEventListener('loadeddata', ready);
       video.removeEventListener('play', onPlay);
       video.removeEventListener('pause', onPause);
-      video.removeEventListener('error', onNativeError);
+      video.removeEventListener('error', onVideoError);
       teardown();
-      video.removeAttribute('src');
-      video.load();
     };
-  }, [url, active, attempt, videoRef]);
+  }, [url, cors, needsHeaders, force, active, attempt, videoRef]);
 
   return <video ref={videoRef} playsInline muted={muted} preload="none" aria-label="Vídeo do canal" disablePictureInPicture={false} />;
 }

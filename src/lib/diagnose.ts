@@ -1,6 +1,6 @@
 import type { Channel } from '../../shared/types.ts';
 
-export type Cause = 'offline' | 'geo' | 'cors' | 'media' | 'timeout' | 'device' | 'unknown';
+export type Cause = 'offline' | 'geo' | 'cors' | 'media' | 'timeout' | 'device' | 'mixed' | 'unknown';
 
 export interface HlsErrorLike {
   type: string;
