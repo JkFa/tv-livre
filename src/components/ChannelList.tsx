@@ -64,6 +64,7 @@ export function ChannelList({ channels, numbers, selectedKey, showCountry, isFav
           const key = channelKey(ch);
           const fav = isFavorite(ch);
           const selected = selectedKey === key;
+          const sub = [showCountry ? countryName(ch.country) : '', ch.categories[0] ? categoryLabel(ch.categories[0]) : ''].filter(Boolean).join(' · ');
           return (
             <li
               key={key}
@@ -76,10 +77,8 @@ export function ChannelList({ channels, numbers, selectedKey, showCountry, isFav
                 <span className="row-text">
                   <span className="row-name">{ch.name}</span>
                   <span className="row-meta">
-                    <StatusMark status={ch.status} />
-                    <span className="row-sub">
-                      {[showCountry ? countryName(ch.country) : '', ch.categories[0] ? categoryLabel(ch.categories[0]) : ''].filter(Boolean).join(' · ')}
-                    </span>
+                    <StatusMark status={ch.status} withText />
+                    {sub && <span className="row-sub">{sub}</span>}
                     <ChannelBadges channel={ch} />
                   </span>
                 </span>

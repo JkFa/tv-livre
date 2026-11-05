@@ -80,7 +80,7 @@ export function Player(props: Props) {
   const [isFull, setIsFull] = useState(false);
   const [pipOn, setPipOn] = useState(false);
   const [landscapeHint, setLandscapeHint] = useState(false);
-  const [swipeHint, setSwipeHint] = useState(() => !swipeHintSeen());
+  const [swipeHint, setSwipeHint] = useState(() => !swipeHintSeen() && window.matchMedia('(pointer: coarse)').matches);
 
   // Troca de canal: o mesmo elemento <video> e a mesma tela cheia continuam; só o estado do canal reinicia.
   const channelId = channel ? `${channel.country}/${channel.id}` : '';
@@ -401,7 +401,7 @@ export function Player(props: Props) {
         )}
 
         {/* vinheta de troca: nasce a cada canal novo (key) e some sozinha por CSS */}
-        {armed && (
+        {armed && (mode === 'embed' || (mode === 'hls' && online && !errorState)) && (
           <div className="osd" key={channel.id} aria-hidden="true">
             <span className="osd-num num">{props.number}</span>
             <span className="osd-name">{channel.name}</span>

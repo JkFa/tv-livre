@@ -43,7 +43,8 @@ export function Sheet({ open, onClose, title, children, variant = 'sheet', foote
             <X size={22} />
           </button>
         </header>
-        <div className="sheet-body">{children}</div>
+        {/* o conteúdo só existe enquanto a folha está aberta: mantém o DOM leve (são centenas de opções de país e idioma) */}
+        <div className="sheet-body">{open && children}</div>
         {footer && <footer className="sheet-foot">{footer}</footer>}
       </div>
     </dialog>

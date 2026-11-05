@@ -34,7 +34,7 @@
 .stage:fullscreen { aspect-ratio: auto; height: 100%; max-height: none; }
 /* Telas estreitas: a TV nunca passa de 40% da altura, para sobrar espaço para a grade (barras laterais pretas se preciso) */
 @media (max-width: 959px) and (orientation: portrait) {
-  .stage { aspect-ratio: auto; height: min(56.25vw, 40dvh); }
+  .stage { aspect-ratio: auto; height: min(56.25vw, 38dvh); }
   .stage:fullscreen { height: 100%; }
 }
 .stage:fullscreen video { opacity: 1; }
@@ -69,8 +69,8 @@
   position: absolute; left: 0; top: var(--s-4); display: flex; align-items: stretch; pointer-events: none;
   animation: osd 2.6s var(--ease-in) both;
 }
-.osd-num { background: var(--accent); color: var(--on-accent); font-size: clamp(44px, 12vw, 76px); padding: 8px 14px 6px; display: grid; place-items: center; }
-.osd-name { background: #15110e; color: #f1e9d8; font-weight: 700; font-size: clamp(15px, 3.6vw, 20px); padding: 0 16px 0 12px; display: grid; align-items: center; max-width: 52vw; }
+.osd-num { background: var(--accent); color: var(--on-accent); font-size: clamp(34px, 9vw, 52px); padding: 6px 12px 4px; display: grid; place-items: center; }
+.osd-name { background: #15110e; color: #f1e9d8; font-weight: 700; font-size: clamp(14px, 3.4vw, 18px); padding: 0 14px 0 10px; display: grid; align-items: center; max-width: 52vw; }
 @keyframes osd {
   0% { transform: translateX(-16px); opacity: 0; }
   7% { transform: none; opacity: 1; }
@@ -118,6 +118,17 @@
 .alternatives ul { display: flex; flex-wrap: wrap; gap: var(--s-2); }
 .alternatives button { min-height: 40px; padding: 0 var(--s-3); border: 1.5px solid #5a5143; font-weight: 600; font-size: 14px; border-radius: var(--r-s); color: #f1e9d8; }
 .alternatives button:hover { border-color: var(--accent); }
+
+/* celular: painel de problema compacto para caber no 16:9 sem cortar a ação principal */
+@media (max-width: 599px) {
+  .problem { padding: var(--s-3) var(--s-4); gap: 6px; }
+  .problem .mark { display: none; }
+  .problem h3 { font-size: 16px; }
+  .problem p { font-size: 14px; line-height: 1.35; }
+  .problem .btn-row { margin-top: 6px; }
+  .problem .btn { min-height: 44px; padding: 0 var(--s-3); font-size: 14px; }
+  .problem .tech { display: none; }
+}
 
 /* dial: o controle remoto */
 .dial { display: grid; grid-template-columns: 72px 1fr 52px 72px; align-items: stretch; height: 56px; border-bottom: 1px solid var(--rule); background: var(--surface); }
@@ -183,7 +194,7 @@
 .sk-name { height: 14px; }
 @keyframes pulse { 50% { opacity: 0.45; } }
 
-.status { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 600; color: var(--muted); flex: none; }
+.status { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 700; color: var(--muted); flex: none; }
 .status-online { color: var(--text); }
 .status svg { flex: none; }
 .badges { display: inline-flex; gap: 6px; }
@@ -195,6 +206,7 @@
 .bottom-nav button { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 12px; font-weight: 700; color: var(--muted); min-width: 48px; }
 .bottom-nav button[aria-current='page'] { color: var(--text); }
 .bottom-nav button[aria-current='page']::before { content: ''; position: absolute; top: -1px; left: 22%; right: 22%; height: 3px; background: var(--accent); }
+.bottom-nav button:focus-visible { outline-offset: -4px; }
 .bottom-nav .zap-btn { background: var(--accent); color: var(--on-accent); font-size: 13px; transition: transform var(--t-micro) var(--ease-in); }
 .bottom-nav .zap-btn:active { transform: translateY(1px); }
 
@@ -254,8 +266,8 @@
   .grade { border-top: 0; border-left: 1px solid var(--rule); }
   .stage { border: 1px solid var(--rule); }
   .stage:fullscreen { border: 0; }
-  .osd-num { font-size: 88px; padding: 10px 18px 8px; }
-  .osd-name { font-size: 22px; }
+  .osd-num { font-size: 68px; padding: 8px 16px 6px; }
+  .osd-name { font-size: 20px; }
   .problem { padding: var(--s-6); gap: var(--s-3); }
   .problem h3 { font-size: 24px; }
   .dial { grid-template-columns: 120px 1fr 64px 120px; height: 64px; border: 1px solid var(--rule); border-top: 0; }

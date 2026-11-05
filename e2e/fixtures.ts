@@ -78,3 +78,12 @@ export async function swipe(page: Page, selector: string, dx: number, startXRati
 /** Simula um canal fora do ar: o servidor responde 404 (com CORS liberado, como um servidor real faria). */
 export const deadStream = (route: Route) =>
   route.fulfill({ status: 404, headers: { 'access-control-allow-origin': '*' }, contentType: 'text/plain', body: 'not found' });
+
+/** Servidor que responde, mas nunca entrega segmentos: o player fica "conectando" (sem erro). */
+export const stalledStream = (route: Route) =>
+  route.fulfill({
+    status: 200,
+    headers: { 'access-control-allow-origin': '*' },
+    contentType: 'application/vnd.apple.mpegurl',
+    body: '#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:6\n#EXT-X-MEDIA-SEQUENCE:0\n',
+  });

@@ -1,5 +1,5 @@
 import type { Channel } from '../shared/types.ts';
-import { brChannels, COUNTER_VALUE, deadStream, expect, openChannel, playableHls, search, searchBox, swipe, test } from './fixtures.ts';
+import { brChannels, COUNTER_VALUE, deadStream, expect, openChannel, playableHls, search, searchBox, stalledStream, swipe, test } from './fixtures.ts';
 
 // Roda tanto contra o build local (vite preview) quanto contra o site publicado (BASE_URL).
 
@@ -38,15 +38,15 @@ test('filtros em folha: escolher categoria, ver o chip e limpar tudo', async ({ 
   const sheet = page.getByRole('dialog', { name: 'País e filtros' });
   await expect(sheet).toBeVisible();
   await sheet.getByRole('button', { name: 'Notícias', exact: true }).click();
-  await sheet.getByRole('button', { name: 'Online', exact: true }).click();
+  await sheet.getByRole('button', { name: 'No ar', exact: true }).click();
   await sheet.getByRole('button', { name: /^Ver \d/ }).click();
   await expect(sheet).toBeHidden();
   const chips = page.getByRole('list', { name: 'Filtros ativos' });
   await expect(chips.getByRole('button', { name: /Remover filtro Notícias/ })).toBeVisible();
-  await expect(chips.getByRole('button', { name: /Remover filtro Online/ })).toBeVisible();
+  await expect(chips.getByRole('button', { name: /Remover filtro No ar/ })).toBeVisible();
   await chips.getByRole('button', { name: /Remover filtro Notícias/ }).click();
   await expect(chips.getByRole('button', { name: /Remover filtro Notícias/ })).toHaveCount(0);
-  await chips.getByRole('button', { name: /Remover filtro Online/ }).click();
+  await chips.getByRole('button', { name: /Remover filtro No ar/ }).click();
   await expect(chips).toBeHidden();
 });
 
@@ -56,6 +56,15 @@ test('Esc fecha a folha de filtros', async ({ page }) => {
   await expect(sheet).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(sheet).toBeHidden();
+});
+
+test('a vinheta de troca não cobre o painel de erro', async ({ page, request }) => {
+  const br = await brChannels(request);
+  const target = br.find(playableHls)!;
+  await page.route(target.url, deadStream);
+  await openChannel(page, target.name);
+  await expect(page.getByRole('alert')).toBeVisible({ timeout: 40_000 });
+  await expect(page.locator('.osd')).toHaveCount(0);
 });
 
 test('sintonizar mostra o canal; tocar com a rede falhando explica a causa e sugere outros', async ({ page, request }) => {
@@ -75,7 +84,7 @@ test('sintonizar mostra o canal; tocar com a rede falhando explica a causa e sug
 test('trocar de canal: botões do dial e vinheta com número e nome', async ({ page, request }) => {
   const br = await brChannels(request);
   const target = br.find(playableHls)!;
-  await page.route('**/*.m3u8*', deadStream);
+  await page.route('**/*.m3u8*', stalledStream); // conectando: a vinheta aparece sobre o vídeo
   await openChannel(page, target.name);
 
   const before = await page.title();

@@ -11,9 +11,9 @@ export const CATEGORY_LABELS: Record<string, string> = {
 };
 
 export const STATUS_LABELS: Record<Status, string> = {
-  online: 'Online',
-  offline: 'Offline',
-  desconhecido: 'Desconhecido',
+  online: 'No ar',
+  offline: 'Fora do ar',
+  desconhecido: 'Não confirmado',
 };
 
 export const KIND_LABELS: Record<StreamKind, string> = {

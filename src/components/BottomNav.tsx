@@ -2,6 +2,8 @@ import { Ellipsis, Search, Shuffle, Star, Tv } from 'lucide-react';
 
 interface Props {
   view: 'todos' | 'favoritos' | 'recentes';
+  /** Em páginas de texto (Sobre, Instalar) nenhuma aba de canais fica marcada; "Mais" fica. */
+  onDoc: boolean;
   onView: (v: 'todos' | 'favoritos') => void;
   onShuffle: () => void;
   onSearch: () => void;
@@ -9,14 +11,14 @@ interface Props {
 }
 
 /** Navegação ao alcance do polegar. O botão central (Zapear) é a ação principal do app. */
-export function BottomNav({ view, onView, onShuffle, onSearch, onMore }: Props) {
+export function BottomNav({ view, onDoc, onView, onShuffle, onSearch, onMore }: Props) {
   return (
     <nav className="bottom-nav" aria-label="Navegação principal">
-      <button type="button" aria-current={view === 'todos' ? 'page' : undefined} onClick={() => onView('todos')}>
+      <button type="button" aria-current={!onDoc && view === 'todos' ? 'page' : undefined} onClick={() => onView('todos')}>
         <Tv size={22} aria-hidden="true" />
         <span>Canais</span>
       </button>
-      <button type="button" aria-current={view !== 'todos' ? 'page' : undefined} onClick={() => onView('favoritos')}>
+      <button type="button" aria-current={!onDoc && view !== 'todos' ? 'page' : undefined} onClick={() => onView('favoritos')}>
         <Star size={22} aria-hidden="true" />
         <span>Favoritos</span>
       </button>
@@ -28,7 +30,7 @@ export function BottomNav({ view, onView, onShuffle, onSearch, onMore }: Props) 
         <Search size={22} aria-hidden="true" />
         <span>Buscar</span>
       </button>
-      <button type="button" onClick={onMore}>
+      <button type="button" aria-current={onDoc ? 'page' : undefined} onClick={onMore}>
         <Ellipsis size={22} aria-hidden="true" />
         <span>Mais</span>
       </button>

@@ -501,6 +501,7 @@ export default function App() {
 
       <BottomNav
         view={view}
+        onDoc={isDoc}
         onView={(v) => { goHome(); setView(v); }}
         onShuffle={() => { goHome(); shuffle(); }}
         onSearch={focusSearch}

@@ -65,6 +65,7 @@ code { font: 0.9em ui-monospace, 'SFMono-Regular', Menlo, monospace; background:
 
 /* ---------- formulários ---------- */
 .field { display: grid; gap: var(--s-2); border: 0; padding: 0; margin: 0; min-width: 0; }
+.field > legend { margin-bottom: var(--s-2); }
 .field > span, .field > legend { font: 700 12px/1 var(--font-text); text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); padding: 0; }
 select {
   width: 100%; min-height: var(--tap); padding: 0 var(--s-3); border: 1.5px solid var(--rule); border-radius: var(--r-s);

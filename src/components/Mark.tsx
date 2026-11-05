@@ -12,7 +12,7 @@ export function Mark({ size = 28 }: { size?: number }) {
 export function Wordmark() {
   return (
     <span className="wordmark">
-      <span className="wordmark-tv">TV</span>
+      <span className="wordmark-tv">TV</span>{' '}
       <span className="wordmark-livre">LIVRE</span>
     </span>
   );
