@@ -43,7 +43,7 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Testes de ponta a ponta (Playwright: Chromium e WebKit; Android, iPhone e desktop emulados)
+      - name: 'Testes de ponta a ponta (Playwright em Chromium e WebKit; Android, iPhone e desktop emulados)'
         run: |
           npx playwright install --with-deps chromium webkit
           npm run test:e2e
