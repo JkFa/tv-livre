@@ -1,0 +1,20 @@
+﻿#EXTM3U
+#EXTINF:-1 tvg-id="Ok.br" tvg-name="Canal, com vírgula" tvg-logo="https://i.imgur.com/a.png" group-title="Brazil",Canal Com Crlf Ⓨ
+https://exemplo.com/ok.m3u8
+#EXTINF:-1 tvg-id="SemUrl.br" group-title="Brazil",Sem URL (EXTINF órfão)
+#EXTINF:-1 tvg-id="Proximo.br" group-title="Brazil",Canal seguinte ao órfão
+https://exemplo.com/proximo.m3u8
+https://exemplo.com/url-sem-extinf.m3u8
+#EXTINF:-1 tvg-id="Placeholder.jp" group-title="Japan",Sem stream publico
+[NO PUBLIC STREAM]
+#EXTINF:-1,Sem atributos nenhum
+https://exemplo.com/sem-attrs.m3u8
+#EXTINF:-1 tvg-name="Aspas desbalanceadas group-title="Brazil",Titulo Quebrado
+https://exemplo.com/aspas.m3u8
+#EXTINF:-1 tvg-id=SemAspas.br tvg-country=BR group-title=Brazil,Atributos sem aspas
+https://exemplo.com/sem-aspas.m3u8
+#EXTINF:-1 tvg-id="Vlc.br",Canal com opcoes VLC
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 Custom
+#EXTVLCOPT:http-referrer=https://emissora.example/
+https://exemplo.com/vlc.m3u8
+#EXTINF:-1 tvg-id="Fim.br",EXTINF no fim sem URL

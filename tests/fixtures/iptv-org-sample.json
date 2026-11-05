@@ -1,0 +1,1161 @@
+{
+ "channels": [
+  {
+   "id": "123tv.de",
+   "name": "1-2-3.tv",
+   "alt_names": [],
+   "network": null,
+   "owners": [],
+   "country": "DE",
+   "categories": [
+    "shop"
+   ],
+   "is_nsfw": false,
+   "launched": "2020-01-01",
+   "closed": "2026-04-28",
+   "replaced_by": "123live.de",
+   "website": "https://www.1-2-3.tv/"
+  },
+  {
+   "id": "BBCOne.uk",
+   "name": "BBC One",
+   "alt_names": [
+    "BBC1",
+    "BBC Television",
+    "BBC Television Service"
+   ],
+   "network": "BBC Television",
+   "owners": [
+    "BBC"
+   ],
+   "country": "UK",
+   "categories": [
+    "general"
+   ],
+   "is_nsfw": false,
+   "launched": "1936-11-02",
+   "closed": null,
+   "replaced_by": null,
+   "website": "http://www.bbc.co.uk/bbcone/"
+  },
+  {
+   "id": "GloboNews.br",
+   "name": "GloboNews",
+   "alt_names": [],
+   "network": null,
+   "owners": [
+    "Canais Globo"
+   ],
+   "country": "BR",
+   "categories": [
+    "news"
+   ],
+   "is_nsfw": false,
+   "launched": "1996-10-15",
+   "closed": null,
+   "replaced_by": null,
+   "website": "http://globonews.globo.com/"
+  },
+  {
+   "id": "RecordNews.br",
+   "name": "Record News",
+   "alt_names": [],
+   "network": null,
+   "owners": [
+    "Grupo Record"
+   ],
+   "country": "BR",
+   "categories": [
+    "news"
+   ],
+   "is_nsfw": false,
+   "launched": "2007-09-27",
+   "closed": null,
+   "replaced_by": null,
+   "website": "https://noticias.r7.com/record-news/"
+  },
+  {
+   "id": "Retroclub.ar",
+   "name": "Retroclub",
+   "alt_names": [],
+   "network": null,
+   "owners": [],
+   "country": "AR",
+   "categories": [
+    "music"
+   ],
+   "is_nsfw": true,
+   "launched": null,
+   "closed": null,
+   "replaced_by": null,
+   "website": "https://retroclub.xyz"
+  },
+  {
+   "id": "SBTNacional.br",
+   "name": "SBT Nacional",
+   "alt_names": [],
+   "network": null,
+   "owners": [
+    "Grupo Silvio Santos"
+   ],
+   "country": "BR",
+   "categories": [],
+   "is_nsfw": false,
+   "launched": null,
+   "closed": null,
+   "replaced_by": null,
+   "website": "https://www.sbt.com.br/"
+  },
+  {
+   "id": "TVCultura.br",
+   "name": "TV Cultura",
+   "alt_names": [
+    "TV Cultura Nacional",
+    "Cultura"
+   ],
+   "network": null,
+   "owners": [
+    "Fundação Padre Anchieta"
+   ],
+   "country": "BR",
+   "categories": [],
+   "is_nsfw": false,
+   "launched": null,
+   "closed": null,
+   "replaced_by": null,
+   "website": "https://cultura.uol.com.br/"
+  }
+ ],
+ "streams": [
+  {
+   "channel": "123tv.de",
+   "feed": "SD",
+   "title": "1-2-3 TV",
+   "url": "https://123tv-mx1.flex-cdn.net/index.m3u8",
+   "quality": "270p",
+   "labels": [],
+   "user_agent": null,
+   "referrer": null
+  },
+  {
+   "channel": "BBCOne.uk",
+   "feed": "ChannelIslands",
+   "title": "BBC One Channel Islands",
+   "url": "https://vs-cmaf-pushb-uk-live.akamaized.net/x=4/i=urn:bbc:pips:service:bbc_one_channel_islands/pc_hd_abr_v2.mpd",
+   "quality": "720p",
+   "labels": [
+    "Geo-blocked"
+   ],
+   "user_agent": null,
+   "referrer": null
+  },
+  {
+   "channel": "BBCOne.uk",
+   "feed": "ChannelIslands",
+   "title": "BBC One Channel Islands (1080p) (HEVC)",
+   "url": "https://vs-cmaf-pushb-uk-live.akamaized.net/x=4/i=urn:bbc:pips:service:bbc_one_channel_islands/hevc_iptv_mse_v0.mpd",
+   "quality": null,
+   "labels": [
+    "Geo-blocked"
+   ],
+   "user_agent": null,
+   "referrer": null
+  },
+  {
+   "channel": "BBCOne.uk",
+   "feed": "East",
+   "title": "BBC One East",
+   "url": "https://vs-cmaf-pushb-uk-live.akamaized.net/x=4/i=urn:bbc:pips:service:bbc_one_east/pc_hd_abr_v2.mpd",
+   "quality": "720p",
+   "labels": [
+    "Geo-blocked"
+   ],
+   "user_agent": null,
+   "referrer": null
+  },
+  {
+   "channel": "BBCOne.uk",
+   "feed": "East",
+   "title": "BBC One East (1080p) (HEVC)",
+   "url": "https://vs-cmaf-pushb-uk-live.akamaized.net/x=4/i=urn:bbc:pips:service:bbc_one_east/hevc_iptv_mse_v0.mpd",
+   "quality": null,
+   "labels": [
+    "Geo-blocked"
+   ],
+   "user_agent": null,
+   "referrer": null
+  },
+  {
+   "channel": "GloboNews.br",
+   "feed": "SD",
+   "title": "GloboNews",
+   "url": "http://79.127.238.228:14093",
+   "quality": "1080p",
+   "labels": [],
+   "user_agent": null,
+   "referrer": null
+  },
+  {
+   "channel": "RecordNews.br",
+   "feed": "SD",
+   "title": "Record News",
+   "url": "https://playplusnews-lh.akamaihd.net/i/pp_nws@377849/master.m3u8",
+   "quality": "720p",
+   "labels": [
+    "Geo-blocked"
+   ],
+   "user_agent": null,
+   "referrer": null
+  },
+  {
+   "channel": "RecordNews.br",
+   "feed": "SD",
+   "title": "Record News",
+   "url": "http://45.162.64.114/RECORD_NEWS/index.m3u8",
+   "quality": "720p",
+   "labels": [],
+   "user_agent": null,
+   "referrer": null
+  },
+  {
+   "channel": "RecordNews.br",
+   "feed": "SD",
+   "title": "Record News",
+   "url": "http://45.177.114.115/RECORD_NEWS/index.m3u8",
+   "quality": "720p",
+   "labels": [],
+   "user_agent": null,
+   "referrer": null
+  },
+  {
+   "channel": "RecordNews.br",
+   "feed": "SD",
+   "title": "Record News",
+   "url": "http://168.197.104.22/RECORD_NEWS/index.m3u8",
+   "quality": "720p",
+   "labels": [],
+   "user_agent": null,
+   "referrer": null
+  },
+  {
+   "channel": "Retroclub.ar",
+   "feed": "HD",
+   "title": "Retroclub",
+   "url": "https://video03.logicahost.com.br/retroclub02/retroclub02/playlist.m3u8",
+   "quality": "720p",
+   "labels": [],
+   "user_agent": null,
+   "referrer": null
+  },
+  {
+   "channel": "SBTNacional.br",
+   "feed": "SD",
+   "title": "SBT Nacional",
+   "url": "https://6836041ea1117.streamlock.net/cverde/cverde/playlist.m3u8",
+   "quality": "720p",
+   "labels": [],
+   "user_agent": null,
+   "referrer": null
+  },
+  {
+   "channel": "SBTNacional.br",
+   "feed": "SD",
+   "title": "SBT Nacional",
+   "url": "https://media.cdntvms.com.br/sbt_sat/index.m3u8",
+   "quality": "576p",
+   "labels": [],
+   "user_agent": null,
+   "referrer": null
+  },
+  {
+   "channel": "SBTNacional.br",
+   "feed": "SD",
+   "title": "SBT Nacional",
+   "url": "https://cdn.live.br1.jmvstream.com/w/LVW-10801/LVW10801_Xvg4R0u57n/chunklist.m3u8",
+   "quality": "1080p",
+   "labels": [],
+   "user_agent": null,
+   "referrer": null
+  },
+  {
+   "channel": "TVCultura.br",
+   "feed": "SD",
+   "title": "TV Cultura",
+   "url": "http://45.162.64.114/TV_CULTURA/index.m3u8",
+   "quality": "720p",
+   "labels": [],
+   "user_agent": null,
+   "referrer": null
+  },
+  {
+   "channel": "TVCultura.br",
+   "feed": "SD",
+   "title": "TV Cultura",
+   "url": "http://45.177.114.115/TV_CULTURA/index.m3u8",
+   "quality": "720p",
+   "labels": [],
+   "user_agent": null,
+   "referrer": null
+  },
+  {
+   "channel": "TVCultura.br",
+   "feed": "SD",
+   "title": "TV Cultura",
+   "url": "http://168.197.104.22/TV_CULTURA/index.m3u8",
+   "quality": "720p",
+   "labels": [],
+   "user_agent": null,
+   "referrer": null
+  },
+  {
+   "channel": "TVCultura.br",
+   "feed": "SD",
+   "title": "TV Cultura",
+   "url": "http://170.83.16.50/CULTURA/index.m3u8",
+   "quality": "720p",
+   "labels": [],
+   "user_agent": null,
+   "referrer": null
+  }
+ ],
+ "feeds": [
+  {
+   "channel": "123tv.de",
+   "id": "SD",
+   "name": "SD",
+   "alt_names": [],
+   "is_main": true,
+   "broadcast_area": [
+    "c/DE"
+   ],
+   "timezones": [
+    "Europe/Berlin"
+   ],
+   "languages": [
+    "deu"
+   ],
+   "format": "576i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "Cambridgeshire",
+   "name": "Cambridgeshire",
+   "alt_names": [],
+   "is_main": false,
+   "broadcast_area": [
+    "c/UK"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "576i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "CambridgeshireHD",
+   "name": "Cambridgeshire HD",
+   "alt_names": [],
+   "is_main": false,
+   "broadcast_area": [
+    "c/UK"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "1080i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "ChannelIslands",
+   "name": "Channel Islands",
+   "alt_names": [],
+   "is_main": false,
+   "broadcast_area": [
+    "c/GG"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "576i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "ChannelIslandsHD",
+   "name": "Channel Islands HD",
+   "alt_names": [],
+   "is_main": false,
+   "broadcast_area": [
+    "c/GG"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "1080i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "East",
+   "name": "East",
+   "alt_names": [],
+   "is_main": false,
+   "broadcast_area": [
+    "c/UK"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "576i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "EastHD",
+   "name": "East HD",
+   "alt_names": [],
+   "is_main": false,
+   "broadcast_area": [
+    "c/UK"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "1080i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "EastMidlands",
+   "name": "East Midlands",
+   "alt_names": [],
+   "is_main": false,
+   "broadcast_area": [
+    "c/UK"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "576i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "EastMidlandsHD",
+   "name": "East Midlands HD",
+   "alt_names": [],
+   "is_main": false,
+   "broadcast_area": [
+    "c/UK"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "1080i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "London",
+   "name": "London",
+   "alt_names": [],
+   "is_main": true,
+   "broadcast_area": [
+    "c/UK"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "576i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "LondonHD",
+   "name": "London HD",
+   "alt_names": [],
+   "is_main": false,
+   "broadcast_area": [
+    "c/UK"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "1080i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "NorthEastCumbria",
+   "name": "North East & Cumbria",
+   "alt_names": [],
+   "is_main": false,
+   "broadcast_area": [
+    "c/UK"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "576i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "NorthEastCumbriaHD",
+   "name": "North East & Cumbria HD",
+   "alt_names": [],
+   "is_main": false,
+   "broadcast_area": [
+    "c/UK"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "1080i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "NorthernIreland",
+   "name": "Northern Ireland",
+   "alt_names": [],
+   "is_main": false,
+   "broadcast_area": [
+    "c/UK"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "576i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "NorthernIrelandHD",
+   "name": "Northern Ireland HD",
+   "alt_names": [],
+   "is_main": false,
+   "broadcast_area": [
+    "c/UK"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "1080i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "NorthWest",
+   "name": "North West",
+   "alt_names": [],
+   "is_main": false,
+   "broadcast_area": [
+    "c/UK"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "576i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "NorthWestHD",
+   "name": "North West HD",
+   "alt_names": [],
+   "is_main": false,
+   "broadcast_area": [
+    "c/UK"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "1080i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "Oxfordshire",
+   "name": "Oxfordshire",
+   "alt_names": [],
+   "is_main": false,
+   "broadcast_area": [
+    "c/UK"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "576i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "OxfordshireHD",
+   "name": "Oxfordshire HD",
+   "alt_names": [],
+   "is_main": false,
+   "broadcast_area": [
+    "c/UK"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "1080i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "Scotland",
+   "name": "Scotland",
+   "alt_names": [],
+   "is_main": false,
+   "broadcast_area": [
+    "c/UK"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "576i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "ScotlandHD",
+   "name": "Scotland HD",
+   "alt_names": [],
+   "is_main": false,
+   "broadcast_area": [
+    "c/UK"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "1080i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "South",
+   "name": "South",
+   "alt_names": [],
+   "is_main": false,
+   "broadcast_area": [
+    "c/UK"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "576i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "SouthEast",
+   "name": "South East",
+   "alt_names": [],
+   "is_main": false,
+   "broadcast_area": [
+    "c/UK"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "576i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "SouthEastHD",
+   "name": "South East HD",
+   "alt_names": [],
+   "is_main": false,
+   "broadcast_area": [
+    "c/UK"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "1080i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "SouthHD",
+   "name": "South HD",
+   "alt_names": [],
+   "is_main": false,
+   "broadcast_area": [
+    "c/UK"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "1080i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "SouthWest",
+   "name": "South West",
+   "alt_names": [],
+   "is_main": false,
+   "broadcast_area": [
+    "c/UK"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "576i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "SouthWestHD",
+   "name": "South West HD",
+   "alt_names": [],
+   "is_main": false,
+   "broadcast_area": [
+    "c/UK"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "1080i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "Wales",
+   "name": "Wales",
+   "alt_names": [],
+   "is_main": false,
+   "broadcast_area": [
+    "s/GB-WLS"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "576i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "WalesHD",
+   "name": "Wales HD",
+   "alt_names": [],
+   "is_main": false,
+   "broadcast_area": [
+    "s/GB-WLS"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "1080i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "West",
+   "name": "West",
+   "alt_names": [],
+   "is_main": false,
+   "broadcast_area": [
+    "c/UK"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "576i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "WestHD",
+   "name": "West HD",
+   "alt_names": [],
+   "is_main": false,
+   "broadcast_area": [
+    "c/UK"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "1080i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "WestMidlands",
+   "name": "West Midlands",
+   "alt_names": [],
+   "is_main": false,
+   "broadcast_area": [
+    "c/UK"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "576i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "WestMidlandsHD",
+   "name": "West Midlands HD",
+   "alt_names": [],
+   "is_main": false,
+   "broadcast_area": [
+    "c/UK"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "1080i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "Yorkshire",
+   "name": "Yorkshire",
+   "alt_names": [],
+   "is_main": false,
+   "broadcast_area": [
+    "c/UK"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "576i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "YorkshireHD",
+   "name": "Yorkshire HD",
+   "alt_names": [],
+   "is_main": false,
+   "broadcast_area": [
+    "c/UK"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "1080i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "YorkshireLincolnshire",
+   "name": "Yorkshire & Lincolnshire",
+   "alt_names": [],
+   "is_main": false,
+   "broadcast_area": [
+    "c/UK"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "576i"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "id": "YorkshireLincolnshireHD",
+   "name": "Yorkshire & Lincolnshire HD",
+   "alt_names": [],
+   "is_main": false,
+   "broadcast_area": [
+    "c/UK"
+   ],
+   "timezones": [
+    "Europe/London"
+   ],
+   "languages": [
+    "eng"
+   ],
+   "format": "1080i"
+  },
+  {
+   "channel": "GloboNews.br",
+   "id": "SD",
+   "name": "SD",
+   "alt_names": [],
+   "is_main": true,
+   "broadcast_area": [
+    "c/BR"
+   ],
+   "timezones": [
+    "America/Sao_Paulo"
+   ],
+   "languages": [
+    "por"
+   ],
+   "format": "480i"
+  },
+  {
+   "channel": "RecordNews.br",
+   "id": "SD",
+   "name": "SD",
+   "alt_names": [],
+   "is_main": true,
+   "broadcast_area": [
+    "c/BR"
+   ],
+   "timezones": [
+    "America/Sao_Paulo"
+   ],
+   "languages": [
+    "por"
+   ],
+   "format": "480i"
+  },
+  {
+   "channel": "Retroclub.ar",
+   "id": "HD",
+   "name": "HD",
+   "alt_names": [],
+   "is_main": true,
+   "broadcast_area": [
+    "c/AR"
+   ],
+   "timezones": [
+    "America/Argentina/Buenos_Aires"
+   ],
+   "languages": [
+    "spa"
+   ],
+   "format": "720p"
+  },
+  {
+   "channel": "SBTNacional.br",
+   "id": "SD",
+   "name": "SD",
+   "alt_names": [],
+   "is_main": true,
+   "broadcast_area": [
+    "c/BR"
+   ],
+   "timezones": [
+    "America/Sao_Paulo"
+   ],
+   "languages": [
+    "por"
+   ],
+   "format": "480i"
+  },
+  {
+   "channel": "TVCultura.br",
+   "id": "SD",
+   "name": "SD",
+   "alt_names": [],
+   "is_main": true,
+   "broadcast_area": [
+    "c/BR"
+   ],
+   "timezones": [
+    "America/Sao_Paulo"
+   ],
+   "languages": [
+    "por"
+   ],
+   "format": "480i"
+  }
+ ],
+ "logos": [
+  {
+   "channel": "123tv.de",
+   "feed": null,
+   "in_use": true,
+   "tags": [],
+   "width": 512,
+   "height": 238,
+   "format": "PNG",
+   "url": "https://i.imgur.com/slSUDNX.png"
+  },
+  {
+   "channel": "BBCOne.uk",
+   "feed": null,
+   "in_use": true,
+   "tags": [],
+   "width": 960,
+   "height": 626,
+   "format": "PNG",
+   "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8b/BBC_One_logo_2021.svg/960px-BBC_One_logo_2021.svg.png"
+  },
+  {
+   "channel": "GloboNews.br",
+   "feed": null,
+   "in_use": true,
+   "tags": [],
+   "width": 512,
+   "height": 124,
+   "format": "PNG",
+   "url": "https://i.imgur.com/3yZyaCm.png"
+  },
+  {
+   "channel": "RecordNews.br",
+   "feed": null,
+   "in_use": true,
+   "tags": [],
+   "width": 294,
+   "height": 417,
+   "format": "PNG",
+   "url": "https://i.imgur.com/HZDRG0K.png"
+  },
+  {
+   "channel": "Retroclub.ar",
+   "feed": null,
+   "in_use": true,
+   "tags": [],
+   "width": 1024,
+   "height": 1024,
+   "format": "PNG",
+   "url": "https://i.ibb.co/5ZpmjN4/retroclub.png"
+  },
+  {
+   "channel": "SBTNacional.br",
+   "feed": null,
+   "in_use": true,
+   "tags": [],
+   "width": 200,
+   "height": 200,
+   "format": "PNG",
+   "url": "https://i.imgur.com/tc1ALuu.png"
+  },
+  {
+   "channel": "TVCultura.br",
+   "feed": null,
+   "in_use": true,
+   "tags": [],
+   "width": 360,
+   "height": 311,
+   "format": "PNG",
+   "url": "https://i.ibb.co/nm0jXMM/cultura-3x.png"
+  }
+ ],
+ "blocklist": [
+  {
+   "channel": "21Sextury.us",
+   "reason": "nsfw",
+   "ref": "https://github.com/iptv-org/iptv/issues/15723"
+  },
+  {
+   "channel": "360Bundesliga.vn",
+   "reason": "dmca",
+   "ref": "https://github.com/github/dmca/blob/master/2020/09/2020-09-16-dfl.md"
+  },
+  {
+   "channel": "40Plus.uk",
+   "reason": "nsfw",
+   "ref": "https://github.com/iptv-org/iptv/issues/15723"
+  }
+ ],
+ "countries": [
+  {
+   "name": "Brazil",
+   "code": "BR",
+   "languages": [
+    "por"
+   ],
+   "flag": "🇧🇷"
+  },
+  {
+   "name": "Japan",
+   "code": "JP",
+   "languages": [
+    "jpn"
+   ],
+   "flag": "🇯🇵"
+  },
+  {
+   "name": "United Kingdom",
+   "code": "UK",
+   "languages": [
+    "eng"
+   ],
+   "flag": "🇬🇧"
+  },
+  {
+   "name": "United States",
+   "code": "US",
+   "languages": [
+    "eng",
+    "spa"
+   ],
+   "flag": "🇺🇸"
+  }
+ ]
+}

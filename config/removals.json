@@ -1,0 +1,7 @@
+{
+  "$comment": "Canais removidos a pedido. O pipeline ignora qualquer canal que bata com um destes critérios. Ver a página Sobre do site.",
+  "channelIds": [],
+  "urls": [],
+  "hosts": [],
+  "names": []
+}

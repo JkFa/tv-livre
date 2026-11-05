@@ -1,0 +1,75 @@
+name: Publicar TV Livre
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 6 * * *' # todo dia, 06:17 UTC (03:17 em Brasília)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Uma publicação por vez; não cancela a que está em andamento para nunca deixar o site pela metade.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  SITE_URL: https://jkfa.github.io/tv-livre
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint, tipos e testes unitários
+        run: npm run check
+
+      # Baixa as duas fontes, une, filtra, testa os links e grava public/data.
+      # Falha (e portanto NÃO publica) se uma fonte estiver fora do ar ou se o total cair mais de 50%.
+      - name: Pipeline de dados
+        run: npm run data
+
+      - name: Build
+        run: npm run build
+
+      - name: Testes de ponta a ponta (Playwright)
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:e2e
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+
+      - name: Resumo dos dados
+        if: always()
+        run: |
+          if [ -f dist/data/index.json ]; then
+            node -e 'const m=require("./dist/data/index.json").meta;console.log(`## Dados\n\n- Total: **${m.total}**\n- Por fonte: ${JSON.stringify(m.bySource)}\n- Por status: ${JSON.stringify(m.byStatus)}\n- Por tipo: ${JSON.stringify(m.byKind)}`)' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

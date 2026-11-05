@@ -1,0 +1,39 @@
+name: Remoção de canal
+description: Peça para um canal deixar de aparecer no TV Livre.
+title: '[Remoção] '
+labels: ['remocao']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        O TV Livre **não hospeda vídeo**: só lista links públicos vindos do [Free-TV](https://github.com/Free-TV/IPTV) e do [iptv-org](https://github.com/iptv-org/iptv).
+        Atendemos pedidos de remoção adicionando o canal a uma lista de exclusão. Para sair também das fontes, abra um pedido nelas.
+  - type: input
+    id: canal
+    attributes:
+      label: Nome do canal
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: Link (URL) do canal no TV Livre ou da transmissão
+      description: Pode ser o endereço do site com `#/canal/...` ou a URL do stream.
+    validations:
+      required: true
+  - type: dropdown
+    id: motivo
+    attributes:
+      label: Motivo
+      options:
+        - Sou o responsável/detentor de direitos do canal
+        - O canal é pago ou restrito
+        - Conteúdo impróprio
+        - Outro
+    validations:
+      required: true
+  - type: textarea
+    id: detalhes
+    attributes:
+      label: Detalhes
+      description: Explique brevemente. Não inclua dados pessoais sensíveis.

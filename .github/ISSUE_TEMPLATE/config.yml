@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Remover o canal também do iptv-org
+    url: https://github.com/iptv-org/iptv/issues/new?template=6_copyright-claim.yml
+    about: Pedido de remoção nas listas de origem (iptv-org).
