@@ -6,6 +6,7 @@ interface Handlers {
   focusSearch: () => void;
   toggleHelp: () => void;
   tuneNumber: (n: number) => void;
+  toggleTv: () => void;
 }
 
 export const sendPlayerCommand = (cmd: 'fullscreen' | 'mute' | 'pip' | 'playpause'): void => {
@@ -81,6 +82,9 @@ export function useShortcuts(handlers: Handlers): string {
           return h.current.focusSearch();
         case '?':
           return h.current.toggleHelp();
+        case 't':
+        case 'T':
+          return h.current.toggleTv();
         case 'f':
         case 'F':
           return sendPlayerCommand('fullscreen');

@@ -10,6 +10,7 @@ const ROWS: [string[], string][] = [
   [['M'], 'Mudo'],
   [['P'], 'Imagem sobre imagem'],
   [['Espaço'], 'Pausar e continuar'],
+  [['T'], 'Modo TV (controle remoto)'],
   [['?'], 'Mostrar esta lista'],
 ];
 

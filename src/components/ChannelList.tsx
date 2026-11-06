@@ -17,23 +17,51 @@ interface Props {
   /** Conteúdo exibido quando a lista está vazia (mensagem + ações). */
   empty: React.ReactNode;
   loading: boolean;
+  /** Altura da linha (maior no Modo TV). */
+  rowHeight?: number;
+  /** Cada vez que muda (e é > 0), rola até o canal sintonizado e põe o foco nele (grade aberta pelo controle remoto). */
+  focusRequest?: number;
 }
 
 const ROW_HEIGHT = 60;
+const FOCUS_TRIES = 8;
 
 /**
  * A "grade" de canais: uma tabela tipográfica. O número de grade é o elemento gráfico; o canal sintonizado
  * ganha o bloco de número preenchido com o acento. Virtualizada: só as linhas visíveis existem no DOM.
  */
-export function ChannelList({ channels, numbers, selectedKey, showCountry, isFavorite, onToggleFavorite, onSelect, empty, loading }: Props) {
+export function ChannelList({ channels, numbers, selectedKey, showCountry, isFavorite, onToggleFavorite, onSelect, empty, loading, rowHeight = ROW_HEIGHT, focusRequest = 0 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line react-hooks/incompatible-library -- API do TanStack Virtual; o componente não depende de memoização
   const virtualizer = useVirtualizer({
     count: channels.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => ROW_HEIGHT,
+    estimateSize: () => rowHeight,
     overscan: 8,
   });
+
+  useEffect(() => {
+    virtualizer.measure();
+  }, [rowHeight, virtualizer]);
+
+  // grade aberta pelo controle remoto: rola até o canal atual e foca nele
+  useEffect(() => {
+    if (!focusRequest) return;
+    const idx = Math.max(0, selectedKey ? channels.findIndex((c) => channelKey(c) === selectedKey) : 0);
+    virtualizer.scrollToIndex(idx, { align: 'center' });
+    let tries = 0;
+    let raf = 0;
+    const attempt = () => {
+      const root = scrollRef.current;
+      const el = root?.querySelector<HTMLElement>('.row-main[aria-current="true"]') ?? root?.querySelector<HTMLElement>('.row-main');
+      if (el) el.focus();
+      else if (tries++ < FOCUS_TRIES) raf = requestAnimationFrame(attempt);
+    };
+    raf = requestAnimationFrame(attempt);
+    return () => cancelAnimationFrame(raf);
+    // só reage ao pedido; a lista e o canal atual são lidos no momento
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusRequest]);
 
   // volta ao topo quando a lista muda de conteúdo (busca/filtro/aba)
   const firstKey = channels[0] ? channelKey(channels[0]) : '';
@@ -45,7 +73,7 @@ export function ChannelList({ channels, numbers, selectedKey, showCountry, isFav
     return (
       <div className="list-scroll" aria-busy="true" aria-label="Carregando canais">
         {Array.from({ length: 9 }, (_, i) => (
-          <div className="row row-skeleton" key={i} style={{ top: i * ROW_HEIGHT, height: ROW_HEIGHT }}>
+          <div className="row row-skeleton" key={i} style={{ top: i * rowHeight, height: rowHeight }}>
             <span className="sk sk-num" />
             <span className="sk sk-name" style={{ width: `${48 + ((i * 17) % 38)}%` }} />
           </div>

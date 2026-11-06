@@ -23,6 +23,8 @@ import { captureInstallPrompt, useInstall, useOnline } from './lib/pwa.ts';
 import { channelHref, navigate, parseHash, useRoute } from './lib/router.ts';
 import { readString, writeString } from './lib/storage.ts';
 import { useShortcuts } from './lib/shortcuts.ts';
+import { applyTv, getTvPref, resolveTv, setTvPref, type TvPref } from './lib/tvmode.ts';
+import { useTvRemote } from './lib/tvremote.ts';
 
 captureInstallPrompt();
 
@@ -47,6 +49,10 @@ export default function App() {
   const [toast, setToast] = useState<string | null>(null);
   const [visits, setVisits] = useState<number | null>(null);
   const [updateDismissed, setUpdateDismissed] = useState(false);
+  const [tvPref, setTvPrefState] = useState<TvPref>(() => getTvPref());
+  const [guideOpen, setGuideOpen] = useState(false);
+  const [focusReq, setFocusReq] = useState(0);
+  const tv = resolveTv(tvPref);
   const searchRef = useRef<HTMLInputElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const pendingZap = useRef(false);
@@ -217,12 +223,49 @@ export default function App() {
     });
   }, [goHome]);
 
+  const isDoc = route.name === 'about' || route.name === 'install';
+
+  // ---- Modo TV: a grade vira um painel sobre o vídeo em tela cheia, aberto e fechado pelo controle remoto ----
+  const changeTvPref = useCallback((p: TvPref) => {
+    setTvPref(p);
+    setTvPrefState(p);
+    setGuideOpen(false);
+  }, []);
+  useEffect(() => {
+    applyTv(tv);
+  }, [tv]);
+  const guideShown = tv && guideOpen;
+  const openGuide = useCallback(() => {
+    setGuideOpen(true);
+    setFocusReq((n) => n + 1);
+  }, []);
+  const closeGuide = useCallback(() => {
+    setGuideOpen(false);
+    (document.activeElement as HTMLElement | null)?.blur?.();
+  }, []);
+
   const digits = useShortcuts({
     zap,
     shuffle,
     focusSearch,
     toggleHelp: () => setSheet((s) => (s === 'help' ? null : 'help')),
     tuneNumber,
+    toggleTv: () => changeTvPref(tv ? 'desligado' : 'ligado'),
+  });
+  useTvRemote({
+    enabled: tv && !isDoc && !!index,
+    guideOpen: guideShown,
+    digits,
+    openGuide,
+    closeGuide,
+    zap,
+    shuffle,
+    toggleFavorite: () => selected && toggle(selected),
+    openFilters: () => setSheet('filters'),
+    searchGuide: () => {
+      openGuide();
+      requestAnimationFrame(() => searchRef.current?.focus());
+    },
   });
 
   // atalhos do app instalado (#/zapear, #/favoritos, #/buscar): executam e voltam para a home
@@ -310,13 +353,12 @@ export default function App() {
     </>
   );
 
-  const isDoc = route.name === 'about' || route.name === 'install';
   const dataDate = index ? new Date(index.meta.generatedAt).toLocaleDateString('pt-BR', { dateStyle: 'long' }) : undefined;
   const showInstallBtn = install.kind === 'prompt' && !install.dismissed && !playing;
   const showIosBar = install.kind === 'ios' && !install.dismissed && !playing && !isDoc;
 
   return (
-    <div className="app">
+    <div className="app" data-doc={isDoc ? '' : undefined}>
       <header className="topbar">
         <a className="brand" href="#/" aria-label="TV Livre, início">
           <Mark size={30} />
@@ -412,7 +454,7 @@ export default function App() {
             )}
           </section>
 
-          <aside className="grade" aria-label="Grade de canais">
+          <aside className="grade" aria-label="Grade de canais" inert={tv && !guideShown} data-open={guideShown ? 'true' : undefined}>
             <div className="grade-head">
               <div className="seg seg-tabs" role="tablist" aria-label="Lista">
                 {(
@@ -491,10 +533,29 @@ export default function App() {
               showCountry={effectiveCountry === ALL_COUNTRIES || view !== 'todos'}
               isFavorite={isFavorite}
               onToggleFavorite={toggle}
-              onSelect={tune}
+              onSelect={(c) => {
+                tune(c);
+                if (tv) closeGuide();
+              }}
               empty={empty}
               loading={loading}
+              rowHeight={tv ? 84 : 60}
+              focusRequest={focusReq}
             />
+            {tv && (
+              <footer className="tv-foot">
+                <ul className="tv-keys" aria-label="Teclas do controle remoto">
+                  <li><kbd>▲▼</kbd> mover</li>
+                  <li><kbd>OK</kbd> assistir</li>
+                  <li><kbd>Voltar</kbd> fechar</li>
+                  <li><kbd className="k-red">●</kbd> favoritar</li>
+                  <li><kbd className="k-green">●</kbd> zapear</li>
+                  <li><kbd className="k-yellow">●</kbd> buscar</li>
+                  <li><kbd className="k-blue">●</kbd> filtros</li>
+                </ul>
+                <button type="button" className="link-btn" onClick={() => changeTvPref('desligado')}>Sair do modo TV</button>
+              </footer>
+            )}
           </aside>
         </main>
       )}
@@ -520,7 +581,7 @@ export default function App() {
           resultCount={visible.length}
         />
       )}
-      <MoreSheet open={sheet === 'more'} onClose={() => setSheet(null)} theme={theme} onTheme={changeTheme} onShortcuts={() => setSheet('help')} dataDate={dataDate} />
+      <MoreSheet open={sheet === 'more'} onClose={() => setSheet(null)} theme={theme} onTheme={changeTheme} onShortcuts={() => setSheet('help')} tvPref={tvPref} onTvPref={changeTvPref} dataDate={dataDate} />
       <ShortcutsDialog open={sheet === 'help'} onClose={() => setSheet(null)} />
 
       {needRefresh && !updateDismissed && (

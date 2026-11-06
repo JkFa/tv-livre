@@ -98,6 +98,15 @@ Player grande à esquerda; grade à direita (380 px). Abaixo do player: dial, n�
 `←/→` e `↑/↓` trocam de canal, `Z` zapeia, `/` busca, `F` tela cheia, `M` mudo, `P` PiP, `Espaço` pausa, `0–9` + `Enter`
 digitam o número, `?` lista os atalhos.
 
+## Modo TV
+
+`html[data-tv='on']` (src/styles/tv.css). O player ocupa a tela inteira; a grade vira um painel de ~50% da largura que entra pela direita (240 ms, só `transform`) e fica `inert` quando fechado. Sem barras, sem navegação inferior, sem controles do player.
+
+- **Tamanhos de sala:** número da vinheta 120 px, linhas da grade de 84 px com número de 52 px e nome de 27 px, botões de 64–88 px.
+- **Foco:** anel de 5 px no acento, com recuo de 3 px (invertido para claro sobre o vídeo). O foco é o cursor; o mouse some.
+- **Teclas coloridas** têm legenda no rodapé da grade; a cor só marca a tecla, o texto diz a ação.
+- **Regra de ouro:** ▲▼ nunca ficam sem efeito. Assistindo, trocam de canal; na grade, movem o foco; num painel de erro, movem entre os botões.
+
 ## Paridade com a versão anterior (tag `pre-rebrand`)
 
 Preservado: índice por país e "Todos os países"; busca sem acento por relevância; filtros de categoria, idioma, status e

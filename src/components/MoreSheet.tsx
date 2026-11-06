@@ -1,5 +1,6 @@
 import { Download, Info, Keyboard } from 'lucide-react';
 import type { ThemePref } from '../lib/prefs.ts';
+import type { TvPref } from '../lib/tvmode.ts';
 import { Sheet } from './Sheet.tsx';
 
 interface Props {
@@ -8,10 +9,12 @@ interface Props {
   theme: ThemePref;
   onTheme: (t: ThemePref) => void;
   onShortcuts: () => void;
+  tvPref: TvPref;
+  onTvPref: (p: TvPref) => void;
   dataDate?: string;
 }
 
-export function MoreSheet({ open, onClose, theme, onTheme, onShortcuts, dataDate }: Props) {
+export function MoreSheet({ open, onClose, theme, onTheme, onShortcuts, tvPref, onTvPref, dataDate }: Props) {
   return (
     <Sheet id="mais" open={open} onClose={onClose} title="Mais">
       <ul className="menu">
@@ -40,6 +43,17 @@ export function MoreSheet({ open, onClose, theme, onTheme, onShortcuts, dataDate
             </button>
           ))}
         </div>
+      </fieldset>
+      <fieldset className="field">
+        <legend>Modo TV</legend>
+        <div className="seg">
+          {(['auto', 'ligado', 'desligado'] as const).map((t) => (
+            <button key={t} type="button" aria-pressed={tvPref === t} onClick={() => onTvPref(t)}>
+              {t === 'auto' ? 'Automático' : t === 'ligado' ? 'Ligado' : 'Desligado'}
+            </button>
+          ))}
+        </div>
+        <p className="muted small">Tela cheia e navegação só pelo controle remoto (setas, OK, Voltar, números). Liga sozinho em navegadores de TV.</p>
       </fieldset>
       {dataDate && <p className="muted small">Lista de canais atualizada em {dataDate}.</p>}
     </Sheet>

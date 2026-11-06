@@ -10,6 +10,7 @@ import { categoryLabel, countryFlag, countryName } from '../lib/labels.ts';
 import { CAUSES, UNSUPPORTED, type UnsupportedWhy } from '../lib/messages.ts';
 import { getMuted, markSwipeHintSeen, setMuted as saveMuted, swipeHintSeen } from '../lib/prefs.ts';
 import { caps, isPlayableHere, unsupportedReason } from '../lib/playback.ts';
+import { isTvNow } from '../lib/tvmode.ts';
 import { canAllowInsecure, downloadM3u, platform, siteSettingsAddress, vlcHref } from '../lib/vlc.ts';
 import { useMediaSession, useWakeLock } from '../lib/media.ts';
 import { ChannelBadges, StatusMark } from './Badges.tsx';
@@ -502,6 +503,7 @@ function TestCard({ dim = false }: { dim?: boolean }) {
 
 /** Abre o canal no VLC sem copiar nada: celular por link direto; computador por um .m3u de um clique. */
 function VlcOpen({ channel, variant = 'accent' }: { channel: Channel; variant?: 'accent' | 'plain' }) {
+  if (isTvNow()) return null; // TV não tem VLC para abrir: a saída é trocar de canal
   const href = vlcHref(channel);
   const cls = variant === 'accent' ? 'btn btn-accent' : 'btn';
   if (href) {
@@ -520,6 +522,7 @@ function VlcOpen({ channel, variant = 'accent' }: { channel: Channel; variant?: 
 
 /** Caminho manual, para quem prefere colar o link ou não tem o app configurado. */
 function CopyLine({ copied, onCopy }: { copied: boolean; onCopy: () => void }) {
+  if (isTvNow()) return null;
   return (
     <p className="vlc-alt">
       Prefere colar no VLC?{' '}
@@ -546,12 +549,15 @@ interface HttpPanelProps {
  * só o usuário, nas configurações do site, e só em navegadores de computador baseados em Chromium.
  */
 function HttpPanel({ channel, copied, onCopy, onRetry, onHow, suggestions, onPick }: HttpPanelProps) {
-  const canAllow = canAllowInsecure();
+  const tvMode = isTvNow();
+  const canAllow = canAllowInsecure() && !tvMode;
   return (
     <Problem
       title={CAUSES.mixed.title}
       text={
-        canAllow
+        tvMode
+          ? 'O navegador da TV bloqueia esse tipo de link. Troque de canal com ▲ ▼ ou abra a grade com OK.'
+          : canAllow
           ? 'O navegador bloqueia esse tipo de link. Libere uma vez para o TV Livre e ele toca aqui, ou abra no VLC.'
           : 'O navegador bloqueia esse tipo de link e não tem opção para liberar. O VLC abre o canal direto, sem copiar nada.'
       }
@@ -567,7 +573,7 @@ function HttpPanel({ channel, copied, onCopy, onRetry, onHow, suggestions, onPic
         ) : (
           <>
             <VlcOpen channel={channel} />
-            <button type="button" className="btn" onClick={onRetry}>
+            <button type="button" className={tvMode ? 'btn btn-accent' : 'btn'} onClick={onRetry}>
               <RotateCw size={18} aria-hidden="true" /> Tentar de novo
             </button>
           </>

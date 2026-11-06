@@ -65,6 +65,28 @@ testar de verdade a partir da origem `https://jkfa.github.io`: o CounterAPI v2 e
 - Limitação inerente: o contador é um endereço público; qualquer pessoa pode chamá-lo. O número é uma contagem de visitas
   sem verificação, não uma métrica auditada.
 
+## Modo TV (controle remoto)
+
+Em navegadores de TV (Samsung/Tizen, LG/webOS, Google TV, Fire TV, Chromecast) o site liga sozinho o **Modo TV**: vídeo em tela cheia, letras e foco grandes para 3 metros, e tudo controlado pelo controle remoto. Em qualquer outro aparelho: **Mais → Modo TV → Ligado**, tecla **T** no teclado, ou abra `?tv=1` no endereço (`?tv=0` desliga, `?tv=auto` volta ao automático). Também há **Sair do modo TV** no rodapé da grade.
+
+| Tecla | Assistindo | Na grade |
+|---|---|---|
+| ▲ ▼ ou CH+ CH- | próximo / anterior canal | mover o foco |
+| OK | abre a grade (ou liga a TV, ou aciona o botão focado) | assistir o canal focado |
+| ◀ ▶ | abre a grade | alternar entre canal e estrela |
+| Voltar | (deixa a TV tratar) | fecha a grade |
+| 0–9 | digita o número do canal (OK confirma, ou espera 1,6 s) | idem |
+| Vermelho | favorita o canal atual | |
+| Verde | zapear (sorteia um canal no ar) | |
+| Amarelo | busca | |
+| Azul | filtros | |
+
+- A navegação por setas é **espacial** (`src/lib/spatial.ts`, testada em unidade): o foco vai para o vizinho mais próximo na direção, também dentro de folhas e painéis de erro.
+- Os códigos das teclas de Tizen (Voltar 10009, CH± 427/428) e webOS (Voltar 461) são tratados em `src/lib/tvmode.ts`.
+- Na TV não aparece "Abrir no VLC" (não há VLC para abrir): quando um canal não toca, o painel leva para trocar de canal.
+- Preferência salva em `tvlivre:modo-tv` (`auto` | `ligado` | `desligado`).
+- **Não testado em TV de verdade**: só em Chromium a 1920×1080 com o teclado. Modelos antigos (Tizen/webOS com Chromium muito velho) podem ter diferenças de CSS ou de teclas.
+
 ## Como o player escolhe como tocar
 
 `src/lib/playback.ts` monta, para cada canal, uma lista de tentativas que o `HlsStage` executa em ordem:
@@ -165,7 +187,7 @@ Rotas usam *hash* (`#/canal/BR/<id>`, `#/sobre`, `#/instalar`), então recarrega
 build ainda copia `index.html` para `404.html`. Os atalhos do manifesto usam `#/zapear`, `#/favoritos` e `#/buscar`.
 
 `localStorage` (todas as leituras e escritas com `try/catch`): `tvlivre:favoritos`, `tvlivre:recentes`, `tvlivre:pais`,
-`tvlivre:ultimo`, `tvlivre:tema`, `tvlivre:mudo`, `tvlivre:instalar-dispensado`, `tvlivre:dica-deslizar`, `tvlivre:http-liberado`.
+`tvlivre:ultimo`, `tvlivre:tema`, `tvlivre:mudo`, `tvlivre:instalar-dispensado`, `tvlivre:dica-deslizar`, `tvlivre:http-liberado`, `tvlivre:modo-tv`.
 
 ## Créditos e licenças
 

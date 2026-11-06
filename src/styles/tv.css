@@ -1,0 +1,81 @@
+/* ===== Modo TV (html[data-tv='on']): tela cheia, grade em painel, tudo pensado para o controle remoto e 3 metros ===== */
+html[data-tv='on'] { cursor: none; }
+html[data-tv='on'] body { overflow: hidden; }
+
+/* a TV é o app: sem barras, sem navegação inferior, sem rodapé do player */
+html[data-tv='on'] .app:not([data-doc]) .topbar,
+html[data-tv='on'] .bottom-nav,
+html[data-tv='on'] .dial,
+html[data-tv='on'] .now,
+html[data-tv='on'] .stage .controls,
+html[data-tv='on'] .swipe-hint,
+html[data-tv='on'] .landscape-hint,
+html[data-tv='on'] .desktop-only { display: none; }
+html[data-tv='on'] .app:not([data-doc]) .workspace { display: block; position: relative; height: 100dvh; }
+html[data-tv='on'] .tv { position: fixed; inset: 0; display: block; padding: 0; margin: 0; max-width: none; }
+html[data-tv='on'] .tv .player { height: 100%; max-width: none; width: 100%; margin: 0; }
+html[data-tv='on'] .tv .stage { height: 100%; width: 100%; aspect-ratio: auto; max-height: none; border: 0; }
+
+/* foco bem visível a 3 metros */
+html[data-tv='on'] :focus-visible { outline: 5px solid var(--accent); outline-offset: 3px; }
+html[data-tv='on'] .row-main:focus-visible { outline-offset: -5px; background: var(--raised); }
+html[data-tv='on'] .stage :focus-visible { outline-color: #f1e9d8; }
+
+/* a grade é um painel que entra pela direita */
+html[data-tv='on'] .grade {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 20; width: min(660px, 50vw); flex: none;
+  background: var(--bg); border: 0; border-left: 3px solid var(--accent);
+  transform: translateX(100%); visibility: hidden;
+  transition: transform var(--t-page, 240ms) var(--ease-out, ease-out), visibility 0s linear 240ms;
+}
+html[data-tv='on'] .grade[data-open='true'] { transform: none; visibility: visible; transition: transform var(--t-page, 240ms) var(--ease-out, ease-out); }
+html[data-tv='on'] .grade-head { padding: var(--s-4) var(--s-4) var(--s-2); gap: var(--s-3); }
+html[data-tv='on'] .seg-tabs button { font-size: 22px; min-height: 60px; }
+html[data-tv='on'] .search { min-height: 64px; font-size: 22px; }
+html[data-tv='on'] .search input { font-size: 22px; }
+html[data-tv='on'] .btn-filters { min-width: 64px; min-height: 64px; }
+html[data-tv='on'] .ctx-row { font-size: 19px; }
+html[data-tv='on'] .ctx-country, html[data-tv='on'] .chip { min-height: 52px; font-size: 19px; }
+html[data-tv='on'] .row-num { width: 112px; font-size: 52px; }
+html[data-tv='on'] .row-name { font-size: 27px; }
+html[data-tv='on'] .row-meta { font-size: 18px; }
+html[data-tv='on'] .fav { width: 88px; }
+html[data-tv='on'] .fav svg { width: 30px; height: 30px; }
+html[data-tv='on'] .tv-foot { flex: none; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s-2) var(--s-4); padding: var(--s-3) var(--s-4); border-top: 1px solid var(--rule); background: var(--surface); }
+.tv-foot { display: none; }
+html[data-tv='on'] .tv-keys { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); font-size: 17px; color: var(--muted); }
+html[data-tv='on'] .tv-keys kbd { margin-right: 6px; min-width: 28px; padding: 2px 8px; border: 1.5px solid var(--rule); background: var(--bg); color: var(--text); font: 700 15px/1.4 var(--font-text); text-align: center; border-radius: var(--r-s); }
+html[data-tv='on'] .k-red { color: #ff5a4d !important; }
+html[data-tv='on'] .k-green { color: #4fbf6b !important; }
+html[data-tv='on'] .k-yellow { color: #e9c23a !important; }
+html[data-tv='on'] .k-blue { color: #5aa0ff !important; }
+html[data-tv='on'] .tv-foot .link-btn { font-size: 18px; min-height: 52px; }
+
+/* vinheta, números digitados e painéis de erro em tamanho de sala */
+html[data-tv='on'] .osd { top: 56px; }
+html[data-tv='on'] .osd-num { font-size: 120px; padding: 12px 32px 8px; }
+html[data-tv='on'] .osd-name { font-size: 38px; max-width: 60vw; padding: 0 28px 0 20px; }
+html[data-tv='on'] .digits { top: 56px; right: 56px; padding: 14px 28px; }
+html[data-tv='on'] .digits .num { font-size: 132px; }
+html[data-tv='on'] .digits small { font-size: 20px; }
+html[data-tv='on'] .status-chip { font-size: 22px; padding: 12px 20px; top: 40px; right: 48px; }
+html[data-tv='on'] .play-big { width: 150px; height: 150px; }
+html[data-tv='on'] .play-big svg { width: 64px; height: 64px; }
+html[data-tv='on'] .idle-panel, html[data-tv='on'] .stage-idle .idle-panel { padding: 56px 72px; gap: var(--s-4); }
+html[data-tv='on'] .idle-kicker { font-size: 22px; }
+html[data-tv='on'] .idle-sub { font-size: 26px; }
+html[data-tv='on'] .btn-xl { min-height: 88px; font-size: 30px; padding: 0 48px; }
+html[data-tv='on'] .problem { padding: 64px 72px; gap: var(--s-4); }
+html[data-tv='on'] .problem h3 { font-size: 40px; }
+html[data-tv='on'] .problem p { font-size: 26px; max-width: 48ch; }
+html[data-tv='on'] .problem .btn, html[data-tv='on'] .alternatives button { min-height: 68px; font-size: 24px; padding: 0 32px; }
+html[data-tv='on'] .alternatives h4 { font-size: 18px; }
+html[data-tv='on'] .problem .tech { font-size: 16px; }
+
+/* folhas (filtros, mais) ficam largas e legíveis */
+html[data-tv='on'] .sheet-panel { font-size: 22px; }
+html[data-tv='on'] .sheet .btn, html[data-tv='on'] .sheet .seg button, html[data-tv='on'] .sheet select { min-height: 64px; font-size: 22px; }
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-tv='on'] .grade, html[data-tv='on'] .grade[data-open='true'] { transition: none; }
+}
