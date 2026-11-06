@@ -183,7 +183,7 @@ public/           ícones, telas de abertura, capturas, og.png (gerados e versio
 config/           lista de remoções
 ```
 
-Rotas usam *hash* (`#/canal/BR/<id>`, `#/sobre`, `#/instalar`), então recarregar a página nunca gera 404 no GitHub Pages; o
+Rotas usam *hash* (`#/` tela inicial, `#/canais` player + grade, `#/canal/BR/<id>`, `#/sobre`, `#/instalar`), então recarregar a página nunca gera 404 no GitHub Pages; o
 build ainda copia `index.html` para `404.html`. Os atalhos do manifesto usam `#/zapear`, `#/favoritos` e `#/buscar`.
 
 `localStorage` (todas as leituras e escritas com `try/catch`): `tvlivre:favoritos`, `tvlivre:recentes`, `tvlivre:pais`,

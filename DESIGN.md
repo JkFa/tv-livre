@@ -4,7 +4,7 @@
 
 A TV aberta brasileira sempre foi **número**: "passa pro 4", "tá no 13". O TV Livre trata o número do canal como
 elemento gráfico principal e a **troca de canal** como a ação central, o produto é um controle remoto que já vem com a
-televisão dentro. A primeira tela é o aparelho: um player e três ações, sem apresentação de marketing.
+televisão dentro. A tela inicial é a TV desligada na sala (uma ação, ligar); o aparelho (player + grade) vem a um toque.
 
 Três ideias seguram o resto:
 
@@ -65,7 +65,7 @@ Ambas OFL, autohospedadas, subset latino, `font-display: swap` com fallback ajus
 | **Player** | 16:9, sempre visível. Estados: espera (tela de ajuste), conectando, no ar, reconectando, erro, incompatível, embed. Controles próprios (sem `controls` nativo) para não brigar com os gestos. |
 | **Vinheta (OSD)** | Bloco sólido (sem vidro) no canto: número enorme + nome. Entra por `transform` em 160 ms, some em ~2,4 s. Digitar números mostra o que foi digitado. |
 | **Dial** | Faixa "‹ 06 · **07 Nome** · 08 ›" abaixo do player: o controle remoto. Alvos de 56 px. |
-| **Navegação inferior** | Canais · Favoritos · **Zapear** (central, acento) · Buscar · Mais. Só abaixo de 960 px. |
+| **Navegação inferior** | Início · Canais · **Zapear** (central, acento) · Buscar · Mais. Só abaixo de 960 px. |
 | **Folha (`Sheet`)** | `<dialog>` nativo (foco preso, Esc, fundo inerte) ancorada embaixo. Filtros, menu "Mais", atalhos. |
 | **Chips de filtro** | Retângulos de canto pequeno, removíveis, com "Limpar tudo". |
 | **Painel de HTTP bloqueado** | Mensagem curta no player (título, 1 frase, 2 botões); o passo a passo vive numa folha `modal` para não estourar o 16:9. Ação principal: *Liberar HTTP* (computador Chromium) ou *Abrir no VLC* (demais). |
@@ -98,6 +98,24 @@ Player grande à esquerda; grade à direita (380 px). Abaixo do player: dial, n�
 `←/→` e `↑/↓` trocam de canal, `Z` zapeia, `/` busca, `F` tela cheia, `M` mudo, `P` PiP, `Espaço` pausa, `0–9` + `Enter`
 digitam o número, `?` lista os atalhos.
 
+## Tela inicial (`#/`)
+
+Porta de entrada. O aparelho (player + grade) mora em `#/canais` e em `#/canal/CC/ID`. Segue as mesmas regras do app:
+régua fina, número grande, um acento, sem cartões e sem logos.
+
+| Bloco | Decisão |
+|---|---|
+| **Vitrine** | Título largo (Archivo 125%), uma ação principal ("Ligar a TV", ou "Continuar: 07 Nome" se há histórico) e uma secundária ("Ver todos os canais"). À direita, a "tela": barras de ajuste com a vinheta do canal em destaque (o último visto; senão um curado no ar, fixo durante o dia). Não toca vídeo nem baixa nada além do país. "Outro canal" avança na lista do dia. |
+| **Ir ao número** | Campo numérico (4 dígitos): o número é a interface também aqui. Aceita os mesmos números digitados no teclado. |
+| **Números** | Faixa de 4 totais em condensado (canais, no ar agora, países, curados), vindos do índice: aparecem sem esperar a grade. |
+| **Vistos há pouco / Favoritos** | Só aparecem se existirem. Linhas de 68 px: número, nome, status por forma. |
+| **No ar agora** | 8 canais curados, no ar e que tocam neste navegador. Esqueleto enquanto o país carrega (sem salto de layout). |
+| **Por assunto / Outros países** | Atalhos que abrem a grade já filtrada ou trocam o país sem sair da tela. Países em código ISO condensado (sem emoji de bandeira, que o Windows não desenha). |
+| **Em qualquer tela** | Celular (instalar), televisão (Modo TV), computador (atalhos). |
+
+Mobile: a ação principal e a "tela" ficam acima da dobra em 360×640; navegação inferior vira Início · Canais · **Zapear** · Buscar · Mais.
+Na TV: sem barras, foco inicial em "Ligar a TV", setas movem o foco, tipografia de 3 metros e seções de ajuda escondidas.
+
 ## Modo TV
 
 `html[data-tv='on']` (src/styles/tv.css). O player ocupa a tela inteira; a grade vira um painel de ~50% da largura que entra pela direita (240 ms, só `transform`) e fica `inert` quando fechado. Sem barras, sem navegação inferior, sem controles do player.
@@ -111,6 +129,6 @@ digitam o número, `?` lista os atalhos.
 
 Preservado: índice por país e "Todos os países"; busca sem acento por relevância; filtros de categoria, idioma, status e
 "só os que tocam no navegador"; grade virtualizada; favoritos (`tvlivre:favoritos`), recentes (`tvlivre:recentes`) e país
-(`tvlivre:pais`) com as mesmas chaves; rotas `#/canal/CC/ID` e `#/sobre`; hls.js e HLS nativo; embed do YouTube e
+(`tvlivre:pais`) com as mesmas chaves; rotas `#/canal/CC/ID` e `#/sobre` (a lista agora vive em `#/canais`; `#/` é a tela inicial); hls.js e HLS nativo; embed do YouTube e
 fallback de link; painéis de HTTP/CORS/cabeçalhos com "copiar para o VLC"; diagnóstico de erro com sugestões; tela cheia;
 página Sobre (créditos, "não hospedamos vídeo", remoção); título dinâmico; `404.html`.

@@ -6,7 +6,7 @@ test.describe('PWA', () => {
   test.use({ serviceWorkers: 'allow' });
 
   test('manifesto: escopo, início, ícones, atalhos e capturas de tela apontam para /tv-livre/', async ({ page, request }) => {
-    await page.goto('./');
+    await page.goto('./#/canais');
     const href = await page.locator('link[rel="manifest"]').getAttribute('href');
     expect(href).toMatch(/manifest\.webmanifest$/);
     const res = await request.get(href!);
@@ -31,7 +31,7 @@ test.describe('PWA', () => {
   });
 
   test('metadados: apple-touch-icon, telas de abertura do iOS, Open Graph e canonical', async ({ page, request }) => {
-    await page.goto('./');
+    await page.goto('./#/canais');
     await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveAttribute('href', /icons\/apple-touch-icon\.png$/);
     expect(await page.locator('link[rel="apple-touch-startup-image"]').count()).toBeGreaterThanOrEqual(10);
     await expect(page.locator('meta[name="apple-mobile-web-app-capable"]')).toHaveAttribute('content', 'yes');
@@ -45,7 +45,7 @@ test.describe('PWA', () => {
 
   test('service worker registra com escopo /tv-livre/ e controla a página', async ({ page, browserName }) => {
     test.skip(browserName !== 'chromium', 'Service worker validado no Chromium; WebKit coberto nos demais testes');
-    await page.goto('./');
+    await page.goto('./#/canais');
     const scope = await page.evaluate(async () => (await navigator.serviceWorker.ready).scope);
     expect(new URL(scope).pathname).toBe(BASE);
     await page.reload();
@@ -59,7 +59,7 @@ test.describe('PWA', () => {
     const br = await brChannels(request);
     const target = br.find((c) => c.kind === 'http') ?? br[0]!;
 
-    await page.goto('./');
+    await page.goto('./#/canais');
     await page.evaluate(() => navigator.serviceWorker.ready);
     await page.reload(); // a partir daqui o SW intercepta e guarda os dados (stale-while-revalidate)
     await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
@@ -90,7 +90,7 @@ test.describe('PWA', () => {
   test('instalação: botão "Instalar" com beforeinstallprompt; some durante a reprodução', async ({ page, browserName, isMobile }) => {
     test.skip(browserName !== 'chromium', 'beforeinstallprompt é do Chromium');
     void isMobile;
-    await page.goto('./');
+    await page.goto('./#/canais');
     await expect(page.getByTestId('channel-row').first()).toBeVisible();
     await page.evaluate(() => {
       const ev = Object.assign(new Event('beforeinstallprompt', { cancelable: true }), {
@@ -122,13 +122,13 @@ test.describe('PWA', () => {
     await expect(page.getByText('Você já está usando o aplicativo instalado.')).toBeVisible();
     await page.evaluate(() => window.dispatchEvent(Object.assign(new Event('beforeinstallprompt', { cancelable: true }), { prompt: async () => undefined, userChoice: Promise.resolve({ outcome: 'dismissed' }) })));
     await expect(page.getByRole('button', { name: 'Instalar', exact: true })).toHaveCount(0);
-    await page.goto('./#/');
+    await page.goto('./#/canais');
     await expect(page.getByRole('button', { name: /Ligar a TV|Voltar ao canal/ })).toBeVisible(); // o app funciona normalmente
   });
 
   test('iPhone: instruções de instalação (Compartilhar > Adicionar à Tela de Início) e dispensa', async ({ page, browserName, isMobile }) => {
     test.skip(!(browserName === 'webkit' && isMobile), 'só no iPhone emulado');
-    await page.goto('./');
+    await page.goto('./#/canais');
     const bar = page.locator('.bar-install');
     await expect(bar).toContainText('Adicionar à Tela de Início');
     await bar.getByRole('button', { name: /Dispensar/ }).click();
@@ -146,10 +146,10 @@ test.describe('PWA', () => {
     }
   });
 
-  test('atalhos do manifesto: #/favoritos e #/buscar executam a ação e voltam para a home', async ({ page }) => {
+  test('atalhos do manifesto: #/favoritos e #/buscar executam a ação e abrem o aparelho (#/canais)', async ({ page }) => {
     await page.goto('./#/favoritos');
     await expect(page.getByRole('tab', { name: /Favoritos/ })).toHaveAttribute('aria-selected', 'true');
-    await expect(page).toHaveURL(/#\/$/);
+    await expect(page).toHaveURL(/#\/canais$/);
     await page.goto('./#/buscar');
     await expect(page.getByRole('searchbox', { name: 'Buscar canal pelo nome' })).toBeFocused();
     await page.goto('./#/zapear');

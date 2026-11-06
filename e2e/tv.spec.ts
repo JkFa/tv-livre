@@ -12,7 +12,7 @@ test.beforeEach(async ({ page }, info) => {
 const title = (page: import('@playwright/test').Page) => page.title();
 
 test('Modo TV: tela cheia, sem barras, grade escondida e fora do foco', async ({ page }) => {
-  await page.goto('./');
+  await page.goto('./#/canais');
   await expect(page.locator('html')).toHaveAttribute('data-tv', 'on');
   await expect(page.locator('.topbar')).toBeHidden();
   await expect(page.locator('.bottom-nav')).toBeHidden();
@@ -110,11 +110,29 @@ test('Modo TV: erro de canal não oferece VLC (TV não tem), mas deixa trocar de
 });
 
 test('Modo TV: dá para sair pela grade e pelo menu; T liga e desliga no teclado', async ({ page }) => {
-  await page.goto('./');
+  await page.goto('./#/canais');
   await page.locator('body').click({ position: { x: 5, y: 5 } });
   await page.keyboard.press('t');
   await expect(page.locator('html')).toHaveAttribute('data-tv', 'off');
   expect(await page.evaluate(() => localStorage.getItem('tvlivre:modo-tv'))).toBe('desligado');
   await page.keyboard.press('t');
   await expect(page.locator('html')).toHaveAttribute('data-tv', 'on');
+});
+
+test('Modo TV: a tela inicial abre com o foco em "Ligar a TV"; setas movem o foco; OK sintoniza', async ({ page }) => {
+  await page.route('**/*.m3u8*', stalledStream);
+  await page.goto('./');
+  await expect(page.locator('html')).toHaveAttribute('data-tv', 'on');
+  await expect(page.locator('.topbar')).toBeHidden();
+  await expect(page.getByTestId('home-ligar')).toBeFocused();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByTestId('home-canais')).toBeFocused();
+  await page.keyboard.press('ArrowLeft');
+  await expect(page.getByTestId('home-ligar')).toBeFocused();
+  await page.keyboard.press('ArrowDown'); // desce pela página: o foco sempre anda e fica dentro da tela inicial
+  await expect(page.getByTestId('home-ligar')).not.toBeFocused();
+  expect(await page.evaluate(() => !!document.activeElement?.closest('.home'))).toBe(true);
+  await page.getByTestId('home-ligar').focus();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/#\/canal\//);
 });

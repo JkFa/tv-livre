@@ -3,6 +3,8 @@ import { moveFocus, remoteKey } from './tvmode.ts';
 
 interface Remote {
   enabled: boolean;
+  /** Na tela inicial as setas só movem o foco entre os botões. */
+  screen: 'home' | 'watch';
   guideOpen: boolean;
   /** O que o usuário está digitando (números de canal): enquanto houver, OK confirma o número. */
   digits: string;
@@ -22,6 +24,7 @@ const INTERACTIVE = 'button, a[href], input, select, summary, [role=tab]';
  *  Assistindo: ▲ ▼ ou CH+ CH- trocam de canal · OK, ◀ ou ▶ abrem a grade · 0–9 digitam o número ·
  *              vermelho favorita · verde zapeia · amarelo busca · azul filtros.
  *  Na grade:   setas movem o foco, OK escolhe, Voltar fecha.
+ *  Na tela inicial: setas movem o foco, OK aciona.
  */
 export function useTvRemote(r: Remote): void {
   const ref = useRef(r);
@@ -78,6 +81,14 @@ export function useTvRemote(r: Remote): void {
       if (k === 'green') return (c.shuffle(), handled());
       if (k === 'yellow') return (c.searchGuide(), handled());
       if (k === 'blue') return (c.openFilters(), handled());
+
+      if (c.screen === 'home') {
+        if (k === 'up' || k === 'down' || k === 'left' || k === 'right') {
+          moveFocus(k, document.querySelector('.home') ?? document);
+          return handled();
+        }
+        return; // OK aciona o botão com foco (Enter nativo); Voltar volta no histórico
+      }
 
       if (c.guideOpen) {
         const grade = document.querySelector('.grade');

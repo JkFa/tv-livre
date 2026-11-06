@@ -18,6 +18,7 @@ import { ChannelLogo } from './ChannelLogo.tsx';
 import { HlsStage, type StageState } from './HlsStage.tsx';
 import { Sheet } from './Sheet.tsx';
 import { Mark } from './Mark.tsx';
+import { TestCard } from './TestCard.tsx';
 import type { Cause } from '../lib/diagnose.ts';
 
 export interface Neighbor {
@@ -488,18 +489,6 @@ export function Player(props: Props) {
 }
 
 const countryFlagText = (c: string) => `${countryFlag(c)} ${countryName(c)}`.trim();
-
-function TestCard({ dim = false }: { dim?: boolean }) {
-  // tela de ajuste: barras em tons de papel e tinta, com uma única barra vermelha
-  const bars = ['#f1e9d8', '#d3c9b4', '#b0a692', '#8c8372', '#69614f', '#ff4b2b', '#3b342b', '#1e1914'];
-  return (
-    <svg className={`testcard${dim ? ' dim' : ''}`} viewBox="0 0 80 45" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-      {bars.map((c, i) => (
-        <rect key={i} x={i * 10} y="0" width="10" height="45" fill={c} />
-      ))}
-    </svg>
-  );
-}
 
 /** Abre o canal no VLC sem copiar nada: celular por link direto; computador por um .m3u de um clique. */
 function VlcOpen({ channel, variant = 'accent' }: { channel: Channel; variant?: 'accent' | 'plain' }) {

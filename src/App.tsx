@@ -3,8 +3,9 @@ import { useRegisterSW } from 'virtual:pwa-register/react';
 import { ChevronDown, Download, Keyboard, Moon, Search, SlidersHorizontal, Sun, X } from 'lucide-react';
 import type { Channel, DataIndex } from '../shared/types.ts';
 import { About } from './components/About.tsx';
-import { BottomNav } from './components/BottomNav.tsx';
+import { BottomNav, type Section } from './components/BottomNav.tsx';
 import { ChannelList } from './components/ChannelList.tsx';
+import { Home } from './components/Home.tsx';
 import { ALL_COUNTRIES, FilterSheet, activeFilterCount } from './components/FilterSheet.tsx';
 import { InstallPage } from './components/InstallPage.tsx';
 import { Mark, Wordmark } from './components/Mark.tsx';
@@ -93,12 +94,24 @@ export default function App() {
   }, [index, country]);
 
   const routeCountry = route.name === 'channel' ? route.country : null;
+  const isHome = route.name === 'home';
+  const isDoc = route.name === 'about' || route.name === 'install';
+  // a tela inicial mostra a grade de um país só (nunca o mundo todo, mesmo que "todos os países" esteja salvo)
+  const homeCountry = useMemo(() => {
+    if (!index) return 'BR';
+    if (effectiveCountry !== ALL_COUNTRIES) return effectiveCountry;
+    return index.countries.some((c) => c.code === 'BR') ? 'BR' : (index.countries[0]?.code ?? 'BR');
+  }, [index, effectiveCountry]);
 
   // quais arquivos de país são necessários agora
   const needed = useMemo(() => {
     if (!index) return [] as string[];
     const set = new Set<string>();
-    if (view === 'todos') {
+    if (isHome) {
+      set.add(homeCountry);
+      recents.slice(0, 6).forEach((r) => set.add(r.country));
+      favorites.slice(0, 6).forEach((r) => set.add(r.country));
+    } else if (view === 'todos') {
       if (effectiveCountry === ALL_COUNTRIES) index.countries.forEach((c) => set.add(c.code));
       else set.add(effectiveCountry);
     } else {
@@ -108,7 +121,7 @@ export default function App() {
     if (routeCountry) set.add(routeCountry);
     if (last) set.add(last.country);
     return [...set];
-  }, [index, view, effectiveCountry, favorites, recents, routeCountry, last]);
+  }, [index, isHome, homeCountry, view, effectiveCountry, favorites, recents, routeCountry, last]);
 
   const missingKey = needed.filter((c) => !(c in store)).join(',');
   useEffect(() => {
@@ -211,19 +224,19 @@ export default function App() {
   }, [resumeChannel, tune, shuffle]);
 
   // ---- foco na busca / navegação ----
-  const goHome = useCallback(() => {
-    if (parseHash(window.location.hash).name === 'about' || parseHash(window.location.hash).name === 'install') navigate('#/');
+  /** Sai da tela inicial e das páginas de texto para o aparelho (player + grade); dentro dele não mexe no endereço. */
+  const goWatch = useCallback(() => {
+    const n = parseHash(window.location.hash).name;
+    if (n !== 'channel' && n !== 'watch') navigate('#/canais');
   }, []);
   const focusSearch = useCallback(() => {
-    goHome();
+    goWatch();
     setView('todos');
     requestAnimationFrame(() => {
       searchRef.current?.focus();
       searchRef.current?.select();
     });
-  }, [goHome]);
-
-  const isDoc = route.name === 'about' || route.name === 'install';
+  }, [goWatch]);
 
   // ---- Modo TV: a grade vira um painel sobre o vídeo em tela cheia, aberto e fechado pelo controle remoto ----
   const changeTvPref = useCallback((p: TvPref) => {
@@ -254,6 +267,7 @@ export default function App() {
   });
   useTvRemote({
     enabled: tv && !isDoc && !!index,
+    screen: isHome ? 'home' : 'watch',
     guideOpen: guideShown,
     digits,
     openGuide,
@@ -273,7 +287,7 @@ export default function App() {
     const handle = () => {
       const r = parseHash(window.location.hash);
       if (r.name !== 'action') return;
-      navigate('#/');
+      navigate('#/canais');
       if (r.action === 'favorites') setView('favoritos');
       if (r.action === 'search') focusSearch();
       if (r.action === 'zap') shuffle();
@@ -298,7 +312,9 @@ export default function App() {
         ? 'Sobre — TV Livre'
         : route.name === 'install'
           ? 'Instalar — TV Livre'
-          : 'TV Livre — TV aberta ao vivo';
+          : route.name === 'watch'
+            ? 'Canais — TV Livre'
+            : 'TV Livre — TV aberta ao vivo';
   }, [selected, route.name, numbers]);
 
   const changeCountry = (code: string) => {
@@ -314,6 +330,38 @@ export default function App() {
   const suggestions = useMemo(() => (selected ? suggestAlternatives(selected, store[selected.country] ?? []) : []), [selected, store]);
 
   const loading = !!missingKey && baseList.length === 0;
+
+  // ---- tela inicial ----
+  const homeChannels = useMemo(() => store[homeCountry] ?? [], [store, homeCountry]);
+  const homeLoading = !(homeCountry in store);
+  const resolve = useCallback(
+    (refs: ChannelRef[]) => {
+      const out: Channel[] = [];
+      for (const r of refs) {
+        const found = store[r.country]?.find((c) => c.id === r.id);
+        if (found) out.push(found);
+        if (out.length >= 6) break;
+      }
+      return out;
+    },
+    [store],
+  );
+  const homeRecents = useMemo(() => (isHome ? resolve(recents) : []), [isHome, resolve, recents]);
+  const homeFavorites = useMemo(() => (isHome ? resolve(favorites) : []), [isHome, resolve, favorites]);
+  const tuneHomeNumber = useCallback(
+    (n: number) => {
+      const c = findByNumber(homeChannels, numbers, n);
+      if (c) tune(c);
+      else say(`Não existe canal ${formatNumber(n)} na grade de ${countryName(homeCountry)}.`);
+    },
+    [homeChannels, numbers, homeCountry, tune, say],
+  );
+  const openCategory = (id: string) => {
+    if (effectiveCountry !== homeCountry) changeCountry(homeCountry);
+    setFilters({ ...EMPTY_FILTERS, category: id });
+    setView('todos');
+    navigate('#/canais');
+  };
   const onlineCount = visible.filter((c) => c.status === 'online').length;
   const nFilters = activeFilterCount(filters);
   const countryLabel = effectiveCountry === ALL_COUNTRIES ? 'Todos os países' : countryName(effectiveCountry);
@@ -356,6 +404,16 @@ export default function App() {
   const dataDate = index ? new Date(index.meta.generatedAt).toLocaleDateString('pt-BR', { dateStyle: 'long' }) : undefined;
   const showInstallBtn = install.kind === 'prompt' && !install.dismissed && !playing;
   const showIosBar = install.kind === 'ios' && !install.dismissed && !playing && !isDoc;
+  const section: Section = isHome ? 'home' : isDoc ? 'doc' : 'watch';
+
+  const iosBar = showIosBar && (
+    <div className="bar bar-install">
+      <Download size={18} aria-hidden="true" />
+      <span>Instale: <b>Compartilhar</b> e depois <b>Adicionar à Tela de Início</b>.</span>
+      <a href="#/instalar" className="link-btn">Como fazer</a>
+      <button type="button" className="icon-btn" onClick={install.dismiss} aria-label="Dispensar convite de instalação"><X size={18} /></button>
+    </div>
+  );
 
   return (
     <div className="app" data-doc={isDoc ? '' : undefined}>
@@ -365,7 +423,8 @@ export default function App() {
           <Wordmark />
         </a>
         <nav className="topnav" aria-label="Principal">
-          <a href="#/" aria-current={!isDoc ? 'page' : undefined}>Canais</a>
+          <a href="#/" aria-current={isHome ? 'page' : undefined}>Início</a>
+          <a href="#/canais" aria-current={!isDoc && !isHome ? 'page' : undefined}>Canais</a>
           <a href="#/instalar" aria-current={route.name === 'install' ? 'page' : undefined}>Instalar</a>
           <a href="#/sobre" aria-current={route.name === 'about' ? 'page' : undefined}>Sobre</a>
         </nav>
@@ -407,6 +466,37 @@ export default function App() {
         <main className="page">
           <p className="center muted" role="status">Sintonizando…</p>
         </main>
+      ) : isHome ? (
+        <>
+          {iosBar}
+          <Home
+            index={index}
+            country={homeCountry}
+            channels={homeChannels}
+            loading={homeLoading}
+            numbers={numbers}
+            resume={resumeChannel}
+            recents={homeRecents}
+            favorites={homeFavorites}
+            digits={digits}
+            tv={tv}
+            onTune={tune}
+            onPower={power}
+            onShuffle={shuffle}
+            onNumber={tuneHomeNumber}
+            onCategory={openCategory}
+            onCountry={changeCountry}
+            onAllCountries={() => {
+              changeCountry(ALL_COUNTRIES);
+              navigate('#/canais');
+            }}
+            onFavorites={() => {
+              setView('favoritos');
+              navigate('#/canais');
+            }}
+            onTv={() => changeTvPref('ligado')}
+          />
+        </>
       ) : (
         <main className="workspace" id="conteudo">
           <section className="tv" aria-label="Televisão">
@@ -444,14 +534,7 @@ export default function App() {
                 digits={digits}
               />
             )}
-            {showIosBar && (
-              <div className="bar bar-install">
-                <Download size={18} aria-hidden="true" />
-                <span>Instale: <b>Compartilhar</b> e depois <b>Adicionar à Tela de Início</b>.</span>
-                <a href="#/instalar" className="link-btn">Como fazer</a>
-                <button type="button" className="icon-btn" onClick={install.dismiss} aria-label="Dispensar convite de instalação"><X size={18} /></button>
-              </div>
-            )}
+            {iosBar}
           </section>
 
           <aside className="grade" aria-label="Grade de canais" inert={tv && !guideShown} data-open={guideShown ? 'true' : undefined}>
@@ -561,10 +644,13 @@ export default function App() {
       )}
 
       <BottomNav
-        view={view}
-        onDoc={isDoc}
-        onView={(v) => { goHome(); setView(v); }}
-        onShuffle={() => { goHome(); shuffle(); }}
+        section={section}
+        onHome={() => navigate('#/')}
+        onWatch={() => {
+          goWatch();
+          setView('todos');
+        }}
+        onShuffle={shuffle}
         onSearch={focusSearch}
         onMore={() => setSheet('more')}
       />

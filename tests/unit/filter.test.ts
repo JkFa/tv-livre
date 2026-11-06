@@ -73,6 +73,8 @@ describe('diagnose (erros do hls.js)', () => {
 describe('rotas por hash', () => {
   it('interpreta canal, sobre e home; ignora lixo', () => {
     expect(parseHash('#/canal/BR/Rede%20Globo.br')).toEqual({ name: 'channel', country: 'BR', id: 'Rede Globo.br' });
+    expect(parseHash('#/')).toEqual({ name: 'home' });
+    expect(parseHash('#/canais')).toEqual({ name: 'watch' });
     expect(parseHash('#/sobre')).toEqual({ name: 'about' });
     expect(parseHash('#/instalar')).toEqual({ name: 'install' });
     expect(parseHash('#/zapear')).toEqual({ name: 'action', action: 'zap' });

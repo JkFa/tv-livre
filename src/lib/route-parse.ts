@@ -1,15 +1,19 @@
 /** Parte pura do roteador (sem DOM), fácil de testar. */
 export type Route =
+  /** Tela inicial. */
   | { name: 'home' }
+  /** O aparelho: player + grade, sem canal escolhido. */
+  | { name: 'watch' }
   | { name: 'about' }
   | { name: 'install' }
-  /** Atalhos do app instalado (manifest): executam uma ação e voltam para a home. */
+  /** Atalhos do app instalado (manifest): executam uma ação e abrem o aparelho (#/canais). */
   | { name: 'action'; action: 'zap' | 'favorites' | 'search' }
   | { name: 'channel'; country: string; id: string };
 
 export function parseHash(hash: string): Route {
   const path = hash.replace(/^#/, '').split('?')[0] ?? '';
   const parts = path.split('/').filter(Boolean);
+  if (parts[0] === 'canais') return { name: 'watch' };
   if (parts[0] === 'sobre') return { name: 'about' };
   if (parts[0] === 'instalar') return { name: 'install' };
   if (parts[0] === 'zapear') return { name: 'action', action: 'zap' };

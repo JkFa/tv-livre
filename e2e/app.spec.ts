@@ -4,7 +4,7 @@ import { brChannels, COUNTER_VALUE, deadStream, expect, openChannel, playableHls
 // Roda tanto contra o build local (vite preview) quanto contra o site publicado (BASE_URL).
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('./');
+  await page.goto('./#/canais');
   await expect(page.getByTestId('channel-row').first()).toBeVisible();
 });
 
@@ -244,7 +244,7 @@ test('favoritos e recentes persistem no localStorage, nas mesmas chaves de sempr
   expect(stored.rec[0]).toEqual({ id: target.id, country: 'BR' });
   expect(stored.last?.id).toBe(target.id);
 
-  await page.goto('./');
+  await page.goto('./#/canais');
   await page.getByRole('tab', { name: /Favoritos/ }).click();
   await expect(page.getByTestId('channel-list')).toContainText(target.name);
   await page.getByRole('tab', { name: 'Recentes' }).click();
@@ -255,7 +255,9 @@ test('retomada: ao voltar, oferece o último canal', async ({ page, request }) =
   const br = await brChannels(request);
   const target = br.find((c) => c.kind === 'http') ?? br[0]!;
   await openChannel(page, target.name);
-  await page.goto('./');
+  await page.goto('./'); // recarrega na tela inicial: o botão principal retoma o último canal
+  await expect(page.getByTestId('home-ligar')).toContainText(target.name);
+  await page.getByTestId('home-canais').click();
   const resume = page.getByRole('button', { name: /^Voltar ao canal \d+/ });
   await expect(resume).toBeVisible();
   await resume.click();
@@ -274,7 +276,7 @@ test('o site funciona mesmo com localStorage indisponível', async ({ browser })
   });
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto('./');
+  await page.goto('./#/canais');
   await expect(page.getByTestId('channel-row').first()).toBeVisible();
   await page.getByRole('button', { name: /^Favoritar / }).first().click();
   expect(errors).toEqual([]);
