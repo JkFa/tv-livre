@@ -1,4 +1,4 @@
-import { brChannels, expect, playableHls, test } from './fixtures.ts';
+import { brChannels, COUNTER_VALUE, expect, playableHls, test } from './fixtures.ts';
 
 // Tela inicial: porta de entrada para os canais. Roda no build local e no site publicado.
 
@@ -102,7 +102,59 @@ test('barra de navegação do celular e menu do computador levam à tela inicial
   await expect(nav.getByText('Início', { exact: true })).toBeVisible();
 });
 
+test('só a tela inicial rola: a página (topo e navegação) fica parada', async ({ page }) => {
+  const m = await page.evaluate(() => ({ doc: document.scrollingElement!.scrollHeight, view: document.scrollingElement!.clientHeight }));
+  expect(m.doc).toBeLessThanOrEqual(m.view);
+});
+
 test('não rola para os lados em nenhuma largura', async ({ page }) => {
   const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth + (document.querySelector('.home')!.scrollWidth - document.querySelector('.home')!.clientWidth));
   expect(over).toBeLessThanOrEqual(0);
+});
+
+test('contador de acessos e região de quem acessa ficam visíveis na tela inicial', async ({ page }) => {
+  const strip = page.getByTestId('visitas-home');
+  await strip.scrollIntoViewIfNeeded();
+  await expect(page.getByTestId('visitas-total')).toHaveText(COUNTER_VALUE.toLocaleString('pt-BR'));
+  await expect(strip).toContainText('acessos ao site');
+  await expect(page.getByTestId('visitas-regiao')).toHaveText('Minas Gerais, Brasil');
+  await expect(strip).toContainText('Você está acessando de');
+});
+
+test('no computador, acessos e região também ficam fixos no topo', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'a faixa do topo é só do computador; no celular os dados ficam na tela inicial');
+  const chip = page.getByTestId('visitas-chip');
+  await expect(chip).toBeVisible();
+  await expect(chip).toContainText(`${COUNTER_VALUE.toLocaleString('pt-BR')} acessos`);
+  await expect(chip).toContainText('Minas Gerais, Brasil');
+  await page.getByTestId('home-canais').click();
+  await expect(chip).toBeVisible(); // continua lá no aparelho
+});
+
+test('se o serviço de região falhar, só a região some', async ({ page, context }) => {
+  await context.unroute('https://ipwho.is/**');
+  await context.route('https://ipwho.is/**', (route) => route.abort('failed'));
+  await page.evaluate(() => sessionStorage.clear());
+  await page.reload();
+  await expect(page.getByTestId('home-ligar')).toBeVisible();
+  await expect(page.getByTestId('visitas-total')).toHaveText(COUNTER_VALUE.toLocaleString('pt-BR'));
+  await expect(page.getByTestId('visitas-regiao')).toHaveCount(0);
+});
+
+test('a consulta de região pede só estado e país e não manda nada do usuário', async ({ page, context }) => {
+  const urls: string[] = [];
+  await context.unroute('https://ipwho.is/**');
+  await context.route('https://ipwho.is/**', (route) => {
+    urls.push(route.request().url());
+    return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"success":true,"country":"Brasil","country_code":"BR","region":"Minas Gerais"}' });
+  });
+  await page.evaluate(() => sessionStorage.clear());
+  await page.reload();
+  await expect(page.getByTestId('visitas-regiao')).toBeVisible();
+  expect(urls).toHaveLength(1);
+  expect(urls[0]).toContain('fields=success,country,country_code,region');
+  expect(urls[0]).not.toMatch(/city/);
+  await page.reload(); // a sessão guarda a resposta: não pergunta de novo
+  await expect(page.getByTestId('visitas-regiao')).toBeVisible();
+  expect(urls).toHaveLength(1);
 });

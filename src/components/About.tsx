@@ -84,6 +84,12 @@ export function About({ visits }: { visits: number | null }) {
           sem cookies e sem dados pessoais: o serviço recebe apenas o nome do contador (<code>{COUNTER_NS}</code>). O número
           mostrado é o valor devolvido pelo serviço; se ele estiver fora do ar, o contador some.
         </li>
+        <li>
+          Para mostrar <strong>de onde você está acessando</strong> (estado e país), o seu navegador pergunta ao serviço{' '}
+          <a href="https://ipwho.is" target="_blank" rel="noopener noreferrer">ipwho.is</a>, que enxerga o seu endereço de
+          IP, como qualquer site que você visita. Pedimos só estado e país, sem cidade, sem cookies e sem enviar nada seu. A
+          resposta fica só na sessão do navegador e não é guardada pelo TV Livre. Se o serviço falhar, a região não aparece.
+        </li>
         <li>O app instalado guarda uma cópia da estrutura do site e da lista de canais para abrir offline. Nunca guarda vídeo.</li>
       </ul>
 

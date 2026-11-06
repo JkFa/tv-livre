@@ -111,6 +111,7 @@ régua fina, número grande, um acento, sem cartões e sem logos.
 | **Vistos há pouco / Favoritos** | Só aparecem se existirem. Linhas de 68 px: número, nome, status por forma. |
 | **No ar agora** | 8 canais curados, no ar e que tocam neste navegador. Esqueleto enquanto o país carrega (sem salto de layout). |
 | **Por assunto / Outros países** | Atalhos que abrem a grade já filtrada ou trocam o país sem sair da tela. Países em código ISO condensado (sem emoji de bandeira, que o Windows não desenha). |
+| **Acessos e região** | Faixa logo abaixo dos números: total de acessos em condensado com o acento e "Você está acessando de Minas Gerais, Brasil" com o ícone de local. No computador, uma versão compacta fica fixa no topo de todas as páginas. Some sozinha se os serviços falharem (sem espaço vazio). |
 | **Em qualquer tela** | Celular (instalar), televisão (Modo TV), computador (atalhos). |
 
 Mobile: a ação principal e a "tela" ficam acima da dobra em 360×640; navegação inferior vira Início · Canais · **Zapear** · Buscar · Mais.

@@ -9,11 +9,12 @@ import { Home } from './components/Home.tsx';
 import { ALL_COUNTRIES, FilterSheet, activeFilterCount } from './components/FilterSheet.tsx';
 import { InstallPage } from './components/InstallPage.tsx';
 import { Mark, Wordmark } from './components/Mark.tsx';
+import { VisitChip } from './components/Visits.tsx';
 import { MoreSheet } from './components/MoreSheet.tsx';
 import { OfflineBar, Toast, UpdateBar } from './components/Notices.tsx';
 import { Player, type Neighbor } from './components/Player.tsx';
 import { ShortcutsDialog } from './components/ShortcutsDialog.tsx';
-import { registerVisit, shouldCount } from './lib/counter.ts';
+import { readTotal, registerVisit, shouldCount } from './lib/counter.ts';
 import { loadCountries, loadIndex } from './lib/data.ts';
 import { compareForDisplay, EMPTY_FILTERS, filterChannels, suggestAlternatives, type Filters } from './lib/filter.ts';
 import { categoryLabel, countryName, languageName, STATUS_LABELS } from './lib/labels.ts';
@@ -23,6 +24,7 @@ import { applyTheme, getLastChannel, getTheme, setLastChannel, setTheme, type Th
 import { captureInstallPrompt, useInstall, useOnline } from './lib/pwa.ts';
 import { channelHref, navigate, parseHash, useRoute } from './lib/router.ts';
 import { readString, writeString } from './lib/storage.ts';
+import { fetchRegion, type Region } from './lib/region.ts';
 import { useShortcuts } from './lib/shortcuts.ts';
 import { applyTv, getTvPref, resolveTv, setTvPref, type TvPref } from './lib/tvmode.ts';
 import { useTvRemote } from './lib/tvremote.ts';
@@ -49,6 +51,7 @@ export default function App() {
   const [theme, setThemeState] = useState<ThemePref>(() => getTheme());
   const [toast, setToast] = useState<string | null>(null);
   const [visits, setVisits] = useState<number | null>(null);
+  const [region, setRegion] = useState<Region | null>(null);
   const [updateDismissed, setUpdateDismissed] = useState(false);
   const [tvPref, setTvPrefState] = useState<TvPref>(() => getTvPref());
   const [guideOpen, setGuideOpen] = useState(false);
@@ -85,7 +88,9 @@ export default function App() {
     loadIndex()
       .then(setIndex)
       .catch((e: unknown) => setLoadError(e instanceof Error ? e.message : 'Erro ao carregar os dados'));
-    if (shouldCount()) void registerVisit().then(setVisits);
+    // visita real: conta uma vez por sessão; ambiente local, testes e automação só leem o total
+    void (shouldCount() ? registerVisit() : readTotal()).then(setVisits);
+    void fetchRegion().then(setRegion);
   }, []);
 
   const effectiveCountry = useMemo(() => {
@@ -429,6 +434,7 @@ export default function App() {
           <a href="#/sobre" aria-current={route.name === 'about' ? 'page' : undefined}>Sobre</a>
         </nav>
         <div className="top-actions">
+          <VisitChip total={visits} region={region} />
           {showInstallBtn && (
             <button type="button" className="btn btn-sm btn-outline" onClick={() => void install.prompt()}>
               <Download size={16} aria-hidden="true" /> Instalar
@@ -479,6 +485,8 @@ export default function App() {
             recents={homeRecents}
             favorites={homeFavorites}
             digits={digits}
+            visits={visits}
+            region={region}
             tv={tv}
             onTune={tune}
             onPower={power}

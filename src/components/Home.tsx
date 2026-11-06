@@ -6,6 +6,8 @@ import { categoryLabel, countryName } from '../lib/labels.ts';
 import { channelKey, formatNumber } from '../lib/lineup.ts';
 import { StatusMark } from './Badges.tsx';
 import { Mark, Wordmark } from './Mark.tsx';
+import { VisitStrip } from './Visits.tsx';
+import type { Region } from '../lib/region.ts';
 import { TestCard } from './TestCard.tsx';
 
 const nf = new Intl.NumberFormat('pt-BR');
@@ -22,6 +24,9 @@ interface Props {
   favorites: readonly Channel[];
   /** Números que o usuário está digitando no teclado (mostrados na tela). */
   digits: string;
+  /** Total de acessos ao site e região de quem acessa (null enquanto carregam ou se o serviço falhar). */
+  visits: number | null;
+  region: Region | null;
   tv: boolean;
   onTune: (c: Channel) => void;
   onPower: () => void;
@@ -154,6 +159,7 @@ export function Home(p: Props) {
           <div><dt>países</dt><dd className="num">{nf.format(index.countries.length)}</dd></div>
           <div><dt>curados pelo Free-TV</dt><dd className="num">{nf.format(index.meta.bySource['free-tv'])}</dd></div>
         </dl>
+        <VisitStrip total={p.visits} region={p.region} />
         <p className="stats-note muted small">Lista conferida a cada dia. Última em {updated}.</p>
 
         {p.recents.length > 0 && (

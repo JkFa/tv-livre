@@ -3,6 +3,8 @@ import type { Channel } from '../shared/types.ts';
 
 export const COUNTER_URL = 'https://abacus.jasoncameron.dev/**';
 export const COUNTER_VALUE = 128402;
+export const REGION_URL = 'https://ipwho.is/**';
+export const REGION_BODY = { success: true, country: 'Brasil', country_code: 'BR', region: 'Minas Gerais' };
 
 /**
  * Todo teste roda com o contador simulado: nenhum teste conta ou lê o contador real
@@ -20,6 +22,10 @@ export const test = base.extend<{ counterCalls: string[] }>({
         body: JSON.stringify({ value: COUNTER_VALUE }),
       });
     });
+    // a região também é simulada: nenhum teste consulta o serviço de geolocalização de verdade
+    await context.route(REGION_URL, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(REGION_BODY) }),
+    );
     await use(calls);
   },
   page: async ({ page, counterCalls }, use) => {

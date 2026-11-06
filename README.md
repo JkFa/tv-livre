@@ -59,9 +59,14 @@ testar de verdade a partir da origem `https://jkfa.github.io`: o CounterAPI v2 e
 
 - Conta **no máximo uma visita por sessão** (`sessionStorage`, vale também para o app instalado) com `GET /hit/tvlivre-jkfa/acessos`.
 - Só conta no site publicado, sem automação (`navigator.webdriver`). Nunca em `localhost`, nem nos testes.
-- Mostra o total na página **Sobre** em formato brasileiro (ex.: `128.402 acessos`), exatamente o valor devolvido pelo serviço.
-  Se o serviço falhar ou não houver internet, o contador some.
+- Mostra o total em formato brasileiro (ex.: `128.402 acessos`), exatamente o valor devolvido pelo serviço, em três lugares: bloco
+  grande na **tela inicial**, faixa fixa no **topo do computador** (todas as páginas) e página **Sobre**. Ambiente local, testes e
+  automação só **leem** o total (`GET /get/...`). Se o serviço falhar ou não houver internet, o contador some.
 - Não envia dados pessoais: `credentials: 'omit'`, `referrerPolicy: 'no-referrer'`, só o nome do contador.
+- **Região de quem acessa** ("Você está acessando de Minas Gerais, Brasil"): o navegador consulta o **[ipwho.is](https://ipwho.is)**
+  (HTTPS, CORS aberto, sem chave), que enxerga o IP de quem pergunta. Pedimos só `region`, `country` e `country_code` (sem cidade),
+  sem cookies e sem referência (`src/lib/region.ts`). A resposta fica só em `sessionStorage` (uma consulta por sessão) e nunca é
+  enviada ao contador nem guardada pelo TV Livre. Se o serviço falhar, só a região some. A página Sobre explica isso ao usuário.
 - Limitação inerente: o contador é um endereço público; qualquer pessoa pode chamá-lo. O número é uma contagem de visitas
   sem verificação, não uma métrica auditada.
 

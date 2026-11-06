@@ -318,6 +318,7 @@ test.describe('contador de acessos', () => {
     await context.unroute('https://abacus.jasoncameron.dev/**');
     await context.route('https://abacus.jasoncameron.dev/**', (route) => route.abort('failed'));
     await page.goto('./#/sobre');
+    await page.reload(); // o total já foi lido ao abrir o app: recarrega para o serviço falhar desde o início
     await expect(page.getByRole('heading', { name: 'Sobre o TV Livre' })).toBeVisible();
     await expect(page.getByTestId('contador')).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Privacidade e contador de acessos' })).toBeVisible();
