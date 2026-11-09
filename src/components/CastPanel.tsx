@@ -49,6 +49,17 @@ export function CastPanel({ canal, numero, aparelho, tipo, volume, naoTransmite,
         </div>
       )}
 
+      {(naoTransmite || erro) && (
+        <div className="btn-row">
+          <button type="button" className="btn btn-accent" onClick={onProximo} data-testid="cast-proximo">
+            <SkipForward size={18} aria-hidden="true" /> Próximo canal
+          </button>
+          {erro && onTentar && (
+            <button type="button" className="btn" onClick={onTentar}><RotateCw size={18} aria-hidden="true" /> Tentar de novo</button>
+          )}
+        </div>
+      )}
+      {/* volume, mudo e parar na mesma linha: o palco do celular é baixo (16:9) e nada pode ficar cortado */}
       <div className="cast-ctl">
         {volume && (
           <>
@@ -61,16 +72,6 @@ export function CastPanel({ canal, numero, aparelho, tipo, volume, naoTransmite,
               aria-label="Volume da TV" className="cast-vol"
             />
           </>
-        )}
-      </div>
-      <div className="btn-row">
-        {(naoTransmite || erro) && (
-          <button type="button" className="btn btn-accent" onClick={onProximo} data-testid="cast-proximo">
-            <SkipForward size={18} aria-hidden="true" /> Próximo canal
-          </button>
-        )}
-        {erro && onTentar && (
-          <button type="button" className="btn" onClick={onTentar}><RotateCw size={18} aria-hidden="true" /> Tentar de novo</button>
         )}
         <button type="button" className="btn" onClick={onParar} data-testid="cast-parar">
           <Square size={18} aria-hidden="true" /> Parar transmissão

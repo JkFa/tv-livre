@@ -303,14 +303,16 @@
 .vlc-alt .link-btn { color: #ff7b5f; }
 
 /* ---- transmitir para a TV ---- */
-.cast-panel { position: absolute; inset: 0; z-index: 6; background: #15110e; color: #f1e9d8; display: grid; align-content: center; justify-items: center; gap: var(--s-3); padding: var(--s-4); text-align: center; overflow-y: auto; }
+.cast-panel { position: absolute; inset: 0; z-index: 6; background: #15110e; color: #f1e9d8; display: grid; align-content: center; justify-items: center; gap: var(--s-2); padding: var(--s-2) var(--s-3); text-align: center; overflow-y: auto; }
 .cast-kicker { display: inline-flex; gap: var(--s-2); align-items: center; font-size: 15px; color: #bdb29d; margin: 0; }
 .cast-ch { display: grid; justify-items: center; gap: 2px; min-width: 0; max-width: 100%; }
-.cast-num { font-size: clamp(72px, 22vw, 140px); line-height: 0.82; color: var(--accent); }
+.cast-num { font-size: clamp(56px, 16vw, 140px); line-height: 0.82; color: var(--accent); }
 .cast-name { font: 850 clamp(20px, 4vw, 30px)/1.1 var(--font-display); font-stretch: 112%; overflow-wrap: anywhere; }
-.cast-ctl { display: flex; align-items: center; gap: var(--s-3); width: min(360px, 90%); }
-.cast-ctl:empty { display: none; }
-.cast-vol { flex: 1; min-height: 44px; accent-color: var(--accent); }
+.cast-ctl { display: flex; align-items: center; gap: var(--s-2); width: min(560px, 100%); }
+.cast-ctl .btn { white-space: nowrap; }
+.cast-ctl .btn:last-child { flex: 0 1 auto; min-width: 0; padding-inline: var(--s-3); font-size: 14px; }
+.cast-ctl .btn-icon { flex: none; }
+.cast-vol { flex: 1 1 40px; min-width: 40px; min-height: 44px; accent-color: var(--accent); }
 .cast-erro { display: grid; justify-items: center; gap: 4px; background: #2a241d; border-left: 3px solid var(--accent); padding: var(--s-3) var(--s-4); max-width: 46ch; text-align: left; }
 .cast-erro p { margin: 0; font-size: 14px; color: #bdb29d; }
 .cast-panel .btn { min-height: 44px; }

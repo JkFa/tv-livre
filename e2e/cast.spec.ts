@@ -186,6 +186,7 @@ test('Assistir na Smart TV (menu Mais): endereço curto e número do canal em le
 });
 
 test('Assistir na Smart TV no computador: botão no topo abre a mesma explicação', async ({ page }) => {
+  test.skip(!!test.info().project.use.isMobile, 'o botão do topo só existe no computador (no celular é o menu Mais)');
   await page.goto('./#/canais');
   await page.getByTestId('topbar-smarttv').click();
   await expect(page.getByRole('dialog', { name: 'Assistir na Smart TV' })).toContainText('Modo TV');
