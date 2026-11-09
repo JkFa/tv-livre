@@ -9,7 +9,7 @@ interface Handlers {
   toggleTv: () => void;
 }
 
-export const sendPlayerCommand = (cmd: 'fullscreen' | 'mute' | 'pip' | 'playpause'): void => {
+export const sendPlayerCommand = (cmd: 'fullscreen' | 'mute' | 'pip' | 'playpause' | 'info'): void => {
   document.dispatchEvent(new CustomEvent('tvlivre:cmd', { detail: cmd }));
 };
 

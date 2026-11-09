@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { sendPlayerCommand } from './shortcuts.ts';
 import { moveFocus, remoteKey } from './tvmode.ts';
 
 interface Remote {
@@ -81,6 +82,7 @@ export function useTvRemote(r: Remote): void {
       if (k === 'green') return (c.shuffle(), handled());
       if (k === 'yellow') return (c.searchGuide(), handled());
       if (k === 'blue') return (c.openFilters(), handled());
+      if (k === 'info') return (sendPlayerCommand('info'), handled()); // mostra Agora / A seguir
 
       if (c.screen === 'home') {
         if (k === 'up' || k === 'down' || k === 'left' || k === 'right') {

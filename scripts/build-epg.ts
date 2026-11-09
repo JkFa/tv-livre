@@ -166,6 +166,15 @@ async function convert(items: PlanItem[]): Promise<void> {
     log(`${country}: ${n}/${total} canais (${inherited} herdados do guia anterior), janela +${res.aheadH} h, ${(Buffer.byteLength(json) / 1024).toFixed(1)} KB bruto, ${(res.gzipBytes / 1024).toFixed(1)} KB gzip`);
     rows.push(`| ${country} | ${total} | ${n} | ${res.aheadH} h | ${(Buffer.byteLength(json) / 1024).toFixed(1)} KB | ${(res.gzipBytes / 1024).toFixed(1)} KB |`);
   }
+  // o site só pede o guia dos países que o índice lista (sem 404 à toa)
+  if (outDir === join(dataDir, 'epg') && existsSync(join(dataDir, 'index.json'))) {
+    const indexPath = join(dataDir, 'index.json');
+    const idx = JSON.parse(readFileSync(indexPath, 'utf8')) as DataIndex;
+    const available = countries.filter((c) => existsSync(join(outDir, `${c}.json`)));
+    if (available.length) idx.epg = available;
+    else delete idx.epg;
+    writeFileSync(indexPath, JSON.stringify(idx));
+  }
   if (process.env.GITHUB_STEP_SUMMARY) {
     appendFileSync(
       process.env.GITHUB_STEP_SUMMARY,

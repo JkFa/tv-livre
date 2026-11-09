@@ -16,6 +16,7 @@ import { Player, type Neighbor } from './components/Player.tsx';
 import { ShortcutsDialog } from './components/ShortcutsDialog.tsx';
 import { readTotal, registerVisit, shouldCount } from './lib/counter.ts';
 import { loadCountries, loadIndex } from './lib/data.ts';
+import { comecandoAgora, nowSec, useEpgCountries, useEpgVersion, useGuideClock } from './lib/epg.ts';
 import { compareForDisplay, EMPTY_FILTERS, filterChannels, suggestAlternatives, type Filters } from './lib/filter.ts';
 import { categoryLabel, countryName, languageName, STATUS_LABELS } from './lib/labels.ts';
 import { useFavorites, useRecents, type ChannelRef } from './lib/library.ts';
@@ -128,6 +129,10 @@ export default function App() {
     return [...set];
   }, [index, isHome, homeCountry, view, effectiveCountry, favorites, recents, routeCountry, last]);
 
+  useEpgCountries(needed, index?.epg);
+  const epgVersion = useEpgVersion();
+  const guideTick = useGuideClock([], filters.startingNow ? 60_000 : 3_600_000);
+
   const missingKey = needed.filter((c) => !(c in store)).join(',');
   useEffect(() => {
     if (!missingKey) return;
@@ -166,7 +171,15 @@ export default function App() {
     return out;
   }, [view, effectiveCountry, store, favorites, recents]);
 
-  const visible = useMemo(() => filterChannels(baseList, { ...filters, query: deferredQuery }), [baseList, filters, deferredQuery]);
+  const visible = useMemo(
+    () => {
+      const t = nowSec();
+      return filterChannels(baseList, { ...filters, query: deferredQuery }, { startingNow: (c) => !!comecandoAgora(c, t) });
+    },
+    // epgVersion e guideTick: o filtro "Começando agora" depende do guia carregado e do relógio
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [baseList, filters, deferredQuery, epgVersion, guideTick],
+  );
 
   const selected = useMemo(
     () => (route.name === 'channel' ? (store[route.country]?.find((c) => c.id === route.id) ?? null) : null),
@@ -377,6 +390,7 @@ export default function App() {
   if (filters.category) chips.push({ label: categoryLabel(filters.category), clear: () => setFilters({ ...filters, category: '' }) });
   if (filters.language) chips.push({ label: languageName(filters.language), clear: () => setFilters({ ...filters, language: '' }) });
   if (filters.status) chips.push({ label: STATUS_LABELS[filters.status], clear: () => setFilters({ ...filters, status: '' }) });
+  if (filters.startingNow) chips.push({ label: 'Começando agora', clear: () => setFilters({ ...filters, startingNow: false }) });
   if (filters.playableOnly) chips.push({ label: 'Só no navegador', clear: () => setFilters({ ...filters, playableOnly: false }) });
 
   const empty = (

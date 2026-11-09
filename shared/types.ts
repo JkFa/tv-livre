@@ -62,6 +62,8 @@ export interface DataMeta {
 }
 
 export interface DataIndex {
+  /** Países com guia de programação em data/epg/<PAÍS>.json (escrito pelo build-epg; ausente = nenhum). */
+  epg?: string[];
   meta: DataMeta;
   countries: CountrySummary[];
   categories: FacetCount[];

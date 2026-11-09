@@ -6,6 +6,7 @@ import {
 import type { Channel } from '../../shared/types.ts';
 import { youtubeEmbedUrl } from '../../shared/youtube.ts';
 import { copyText } from '../lib/clipboard.ts';
+import { useGuide } from '../lib/epg.ts';
 import { categoryLabel, countryFlag, countryName } from '../lib/labels.ts';
 import { CAUSES, UNSUPPORTED, type UnsupportedWhy } from '../lib/messages.ts';
 import { getMuted, markSwipeHintSeen, setMuted as saveMuted, swipeHintSeen } from '../lib/prefs.ts';
@@ -15,6 +16,7 @@ import { canAllowInsecure, downloadM3u, platform, siteSettingsAddress, vlcHref }
 import { useMediaSession, useWakeLock } from '../lib/media.ts';
 import { ChannelBadges, StatusMark } from './Badges.tsx';
 import { ChannelLogo } from './ChannelLogo.tsx';
+import { GuideStrip } from './Guide.tsx';
 import { HlsStage, type StageState } from './HlsStage.tsx';
 import { Sheet } from './Sheet.tsx';
 import { Mark } from './Mark.tsx';
@@ -84,6 +86,8 @@ export function Player(props: Props) {
   const [isFull, setIsFull] = useState(false);
   const [pipOn, setPipOn] = useState(false);
   const [landscapeHint, setLandscapeHint] = useState(false);
+  const [infoNonce, setInfoNonce] = useState(0);
+  const guide = useGuide(channel);
   const [swipeHint, setSwipeHint] = useState(() => !swipeHintSeen() && window.matchMedia('(pointer: coarse)').matches);
 
   // Troca de canal: o mesmo elemento <video> e a mesma tela cheia continuam; só o estado do canal reinicia.
@@ -106,7 +110,7 @@ export function Player(props: Props) {
   useEffect(() => onPlayingChange(playing && !paused), [playing, paused, onPlayingChange]);
 
   useMediaSession(
-    channel && armed ? { title: channel.name, artist: 'TV Livre', logo: channel.logo } : null,
+    channel && armed ? { title: channel.name, artist: guide.now?.title ?? 'TV Livre', logo: channel.logo } : null,
     {
       play: () => void videoRef.current?.play(),
       pause: () => videoRef.current?.pause(),
@@ -214,6 +218,7 @@ export function Player(props: Props) {
       else if (cmd === 'mute') toggleMute();
       else if (cmd === 'pip') void togglePip();
       else if (cmd === 'playpause') togglePlay();
+      else if (cmd === 'info') setInfoNonce((n) => n + 1);
     };
     document.addEventListener('tvlivre:cmd', onCmd);
     return () => document.removeEventListener('tvlivre:cmd', onCmd);
@@ -408,7 +413,10 @@ export function Player(props: Props) {
         {armed && (mode === 'embed' || (mode === 'hls' && online && !errorState)) && (
           <div className="osd" key={channel.id} aria-hidden="true">
             <span className="osd-num num">{props.number}</span>
-            <span className="osd-name">{channel.name}</span>
+            <span className="osd-name">
+              {channel.name}
+              {guide.now && <small className="osd-prog">{guide.now.title}</small>}
+            </span>
           </div>
         )}
         <span className="sr-only" role="status" aria-live="polite">{armed ? `Canal ${props.number}, ${channel.name}` : ''}</span>
@@ -419,6 +427,8 @@ export function Player(props: Props) {
             <small>Enter para sintonizar</small>
           </div>
         )}
+
+        {isTvNow() && armed && <GuideStrip channel={channel} overlay nonce={infoNonce} />}
 
         {swipeHint && armed && playing && (
           <div className="swipe-hint" aria-hidden="true">
@@ -458,6 +468,7 @@ export function Player(props: Props) {
       </div>
 
       <Dial {...props} channel={channel} onToggleFavorite={props.onToggleFavorite} />
+      {!isTvNow() && <GuideStrip channel={channel} />}
 
       <div className="now">
         <span className="now-num num" aria-hidden="true">{props.number}</span>
