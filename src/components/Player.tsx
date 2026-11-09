@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Airplay, Cast, ChevronLeft, ChevronRight, Download, ExternalLink, Maximize, Minimize, Pause, PictureInPicture2, Play, Power,
-  RotateCw, ScreenShare, ShieldCheck, Star, Volume2, VolumeX, WifiOff,
+  RotateCw, ScreenShare, Share2, ShieldCheck, Star, Volume2, VolumeX, WifiOff,
 } from 'lucide-react';
 import type { Channel } from '../../shared/types.ts';
 import { youtubeEmbedUrl } from '../../shared/youtube.ts';
 import { castMedia, podeTransmitir } from '../lib/cast.ts';
 import { copyText } from '../lib/clipboard.ts';
+import { useGuide } from '../lib/epg.ts';
 import { diagnoseCast } from '../lib/diagnose.ts';
 import type { CastController } from '../lib/useCast.ts';
 import { programaAgora, temGuia } from '../lib/programa.ts';
@@ -24,6 +25,7 @@ import { useMediaSession, useWakeLock } from '../lib/media.ts';
 import { ChannelBadges, StatusMark } from './Badges.tsx';
 import { CastPanel, type CastErro } from './CastPanel.tsx';
 import { ChannelLogo } from './ChannelLogo.tsx';
+import { GuideStrip } from './Guide.tsx';
 import { DataTip } from './DataTip.tsx';
 import { ModeBar } from './ModeBar.tsx';
 import { RadioScreen } from './RadioScreen.tsx';
@@ -58,6 +60,7 @@ interface Props {
   onPick: (c: Channel) => void;
   onPlayingChange: (playing: boolean) => void;
   digits: string;
+  onShare: () => void;
   /** Transmissão para Chromecast/Google TV (o SDK só é baixado quando o usuário toca em Transmitir). */
   cast: CastController;
   /** Avisos curtos (toast). */
@@ -107,6 +110,8 @@ export function Player(props: Props) {
   const [isFull, setIsFull] = useState(false);
   const [pipOn, setPipOn] = useState(false);
   const [landscapeHint, setLandscapeHint] = useState(false);
+  const [infoNonce, setInfoNonce] = useState(0);
+  const guide = useGuide(channel);
   const [swipeHint, setSwipeHint] = useState(() => !swipeHintSeen() && window.matchMedia('(pointer: coarse)').matches);
   const [castErro, setCastErro] = useState<CastErro | null>(null);
   const [braveOpen, setBraveOpen] = useState(false);
@@ -206,7 +211,7 @@ export function Player(props: Props) {
   useEffect(() => onPlayingChange(playing && !paused), [playing, paused, onPlayingChange]);
 
   useMediaSession(
-    channel && armed ? { title: channel.name, artist: 'TV Livre', logo: channel.logo } : null,
+    channel && armed ? { title: channel.name, artist: guide.now?.title ?? 'TV Livre', logo: channel.logo } : null,
     {
       play: () => void mediaEl()?.play(),
       pause: () => mediaEl()?.pause(),
@@ -328,6 +333,7 @@ export function Player(props: Props) {
       else if (cmd === 'mute') toggleMute();
       else if (cmd === 'pip') void togglePip();
       else if (cmd === 'playpause') togglePlay();
+      else if (cmd === 'info') setInfoNonce((n) => n + 1);
     };
     document.addEventListener('tvlivre:cmd', onCmd);
     return () => document.removeEventListener('tvlivre:cmd', onCmd);
@@ -565,7 +571,10 @@ export function Player(props: Props) {
         {armed && (mode === 'embed' || (mode === 'hls' && online && !errorState)) && (
           <div className="osd" key={channel.id} aria-hidden="true">
             <span className="osd-num num">{props.number}</span>
-            <span className="osd-name">{channel.name}</span>
+            <span className="osd-name">
+              {channel.name}
+              {guide.now && <small className="osd-prog">{guide.now.title}</small>}
+            </span>
           </div>
         )}
         <span className="sr-only" role="status" aria-live="polite">{armed ? `Canal ${props.number}, ${channel.name}` : ''}</span>
@@ -576,6 +585,8 @@ export function Player(props: Props) {
             <small>Enter para sintonizar</small>
           </div>
         )}
+
+        {isTvNow() && armed && <GuideStrip channel={channel} overlay nonce={infoNonce} />}
 
         {swipeHint && armed && playing && (
           <div className="swipe-hint" aria-hidden="true">
@@ -630,6 +641,7 @@ export function Player(props: Props) {
       </div>
 
       <Dial {...props} channel={channel} onToggleFavorite={props.onToggleFavorite} />
+      {!isTvNow() && <GuideStrip channel={channel} />}
       {dica && props.modo === 'normal' && (
         <DataTip onEscolher={(m) => { setDica(false); props.onModo(m); }} onDispensar={() => setDica(false)} />
       )}
@@ -878,7 +890,7 @@ function Problem({ title, text, detail, tone, icon, actions, extra, suggestions,
   );
 }
 
-function Dial({ channel, number, prev, next, onZap, isFavorite, onToggleFavorite }: Props & { channel: Channel }) {
+function Dial({ channel, number, prev, next, onZap, isFavorite, onToggleFavorite, onShare }: Props & { channel: Channel }) {
   return (
     <div className="dial" role="group" aria-label="Controle de canais">
       <button type="button" className="dial-side" onClick={() => onZap(-1)} aria-label={prev ? `Canal anterior: ${prev.number} ${prev.name}` : 'Canal anterior'} disabled={!prev}>
@@ -891,6 +903,9 @@ function Dial({ channel, number, prev, next, onZap, isFavorite, onToggleFavorite
       </div>
       <button type="button" className={`dial-fav${isFavorite ? ' on' : ''}`} onClick={onToggleFavorite} aria-pressed={isFavorite} aria-label={isFavorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'} title={isFavorite ? 'Remover dos favoritos' : 'Favoritar'}>
         <Star size={22} fill={isFavorite ? 'currentColor' : 'none'} aria-hidden="true" />
+      </button>
+      <button type="button" className="dial-share" onClick={onShare} aria-label="Compartilhar este canal" title="Compartilhar (S)" data-testid="share-btn">
+        <Share2 size={20} aria-hidden="true" />
       </button>
       <button type="button" className="dial-side" onClick={() => onZap(1)} aria-label={next ? `Próximo canal: ${next.number} ${next.name}` : 'Próximo canal'} disabled={!next}>
         <span className="num">{next?.number ?? ''}</span>

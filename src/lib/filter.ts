@@ -8,11 +8,13 @@ export interface Filters {
   language: string;
   status: Status | '';
   playableOnly: boolean;
+  /** Só canais com programa que começou há pouco ou começa logo (precisa do guia). */
+  startingNow: boolean;
   /** "Bom para ouvir": notícias, música, religião, conversa, esportes e educação. */
   listen: boolean;
 }
 
-export const EMPTY_FILTERS: Filters = { query: '', category: '', language: '', status: '', playableOnly: false, listen: false };
+export const EMPTY_FILTERS: Filters = { query: '', category: '', language: '', status: '', playableOnly: false, startingNow: false, listen: false };
 
 export function normalizeSearch(text: string): string {
   return text
@@ -44,7 +46,7 @@ export function compareForDisplay(a: Channel, b: Channel): number {
 }
 
 /** Filtra e, havendo busca, ordena por relevância (prefixo > início de palavra > contém). */
-export function filterChannels(list: readonly Channel[], f: Filters): Channel[] {
+export function filterChannels(list: readonly Channel[], f: Filters, ctx: { startingNow?: (c: Channel) => boolean } = {}): Channel[] {
   const q = normalizeSearch(f.query);
   const tokens = q ? q.split(' ') : [];
   const scored: { ch: Channel; score: number }[] = [];
@@ -54,6 +56,7 @@ export function filterChannels(list: readonly Channel[], f: Filters): Channel[] 
     if (f.category && !ch.categories.includes(f.category)) continue;
     if (f.language && !ch.languages.includes(f.language)) continue;
     if (f.playableOnly && !isPlayableHere(ch, caps())) continue;
+    if (f.startingNow && !ctx.startingNow?.(ch)) continue;
     if (f.listen && !bomParaOuvir(ch.categories)) continue;
     let score = 0;
     if (tokens.length) {

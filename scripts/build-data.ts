@@ -3,6 +3,7 @@
  *
  *   npm run data                 # baixa as fontes, testa os links e grava public/data/
  *   npm run data:quick           # sem testes de rede (status = desconhecido)
+ *   tsx scripts/build-data.ts --reuse-health   # não testa links de vídeo: reaproveita o status da publicação anterior (execução só do EPG)
  *   tsx scripts/build-data.ts --limit 300            # testa só 300 links (depuração)
  *   tsx scripts/build-data.ts --freetv f.m3u8 --org-dir dir   # usa arquivos locais em vez de baixar
  *
@@ -118,6 +119,8 @@ async function main() {
   log(prevTotal ? `total anterior: ${prevTotal} → agora ${merged.length}` : 'sem publicação anterior para comparar');
 
   // ----- teste de links -----
+  // --reuse-health: não testa nenhum link (como --no-probe), mas mantém o status da publicação anterior
+  const noNewProbes = flag('reuse-health');
   const prevHealth: HealthFile = (flag('no-probe') ? null : await tryFetchPrevious<HealthFile>('data/health.json')) ?? {};
   const nowMs = Date.now();
   const judged = new Map<string, Judged>(); // por id
@@ -130,11 +133,11 @@ async function main() {
     const prev = prevHealth[hk];
     const probeable = (m.kind === 'hls' || m.kind === 'http' || (m.kind === 'other' && m.url.startsWith('https:'))) && !flag('no-probe');
     if (m.kind === 'youtube' || !probeable) continue;
-    const fresh = prev && nowMs / 60_000 - prev[2] < REUSE_MINUTES && m.kind !== 'other';
+    const fresh = prev && (noNewProbes || nowMs / 60_000 - prev[2] < REUSE_MINUTES) && (noNewProbes || m.kind !== 'other');
     if (fresh) {
       judged.set(m.id, { status: statusFromCode(prev[0]), fails: prev[1], cors: corsFromCode(prev[3]) });
       newHealth[hk] = prev;
-    } else if (toProbe.length < probeLimit) {
+    } else if (!noNewProbes && toProbe.length < probeLimit) {
       toProbe.push({ key: m.id, id: m.id, url: m.url, kind: m.kind, headers: m.probeHeaders });
     }
   }

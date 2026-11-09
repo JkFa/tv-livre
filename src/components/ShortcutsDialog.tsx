@@ -10,6 +10,7 @@ const ROWS: [string[], string][] = [
   [['M'], 'Mudo'],
   [['P'], 'Imagem sobre imagem'],
   [['Espaço'], 'Pausar e continuar'],
+  [['S'], 'Compartilhar o canal'],
   [['R'], 'Modo Rádio (só áudio)'],
   [['T'], 'Modo TV (controle remoto)'],
   [['?'], 'Mostrar esta lista'],

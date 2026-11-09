@@ -1,10 +1,12 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Star } from 'lucide-react';
 import type { Channel } from '../../shared/types.ts';
 import { categoryLabel, countryName } from '../lib/labels.ts';
+import { agora, hasEpg, useEpgVersion, useGuideClock } from '../lib/epg.ts';
 import { channelKey, formatNumber } from '../lib/lineup.ts';
 import { ChannelBadges, StatusMark } from './Badges.tsx';
+import { ProgressBar } from './Guide.tsx';
 
 interface Props {
   channels: Channel[];
@@ -30,8 +32,14 @@ const FOCUS_TRIES = 8;
  * A "grade" de canais: uma tabela tipográfica. O número de grade é o elemento gráfico; o canal sintonizado
  * ganha o bloco de número preenchido com o acento. Virtualizada: só as linhas visíveis existem no DOM.
  */
-export function ChannelList({ channels, numbers, selectedKey, showCountry, isFavorite, onToggleFavorite, onSelect, empty, loading, rowHeight = ROW_HEIGHT, focusRequest = 0 }: Props) {
+export function ChannelList({ channels, numbers, selectedKey, showCountry, isFavorite, onToggleFavorite, onSelect, empty, loading, rowHeight: baseRowHeight = ROW_HEIGHT, focusRequest = 0 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  // guia: a linha do programa só ocupa espaço quando algum canal da lista tem guia; o relógio anda a cada minuto
+  const epgVersion = useEpgVersion();
+  const t = useGuideClock([], 60_000);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- epgVersion é o sinal de que um guia terminou de carregar
+  const anyGuide = useMemo(() => channels.some((c) => hasEpg(c.country)), [channels, epgVersion]);
+  const rowHeight = baseRowHeight + (anyGuide ? (baseRowHeight > 60 ? 30 : 18) : 0);
   // eslint-disable-next-line react-hooks/incompatible-library -- API do TanStack Virtual; o componente não depende de memoização
   const virtualizer = useVirtualizer({
     count: channels.length,
@@ -92,6 +100,7 @@ export function ChannelList({ channels, numbers, selectedKey, showCountry, isFav
           const key = channelKey(ch);
           const fav = isFavorite(ch);
           const selected = selectedKey === key;
+          const prog = anyGuide ? agora(ch, t) : null;
           const sub = [showCountry ? countryName(ch.country) : '', ch.categories[0] ? categoryLabel(ch.categories[0]) : ''].filter(Boolean).join(' · ');
           return (
             <li
@@ -104,6 +113,12 @@ export function ChannelList({ channels, numbers, selectedKey, showCountry, isFav
                 <span className="row-num num" aria-hidden="true">{formatNumber(numbers.get(key))}</span>
                 <span className="row-text">
                   <span className="row-name">{ch.name}</span>
+                  {prog && (
+                    <span className="row-now" data-testid="row-now">
+                      <span className="row-now-title">{prog.title}</span>
+                      <ProgressBar p={prog} t={t} />
+                    </span>
+                  )}
                   <span className="row-meta">
                     <StatusMark status={ch.status} withText />
                     {sub && <span className="row-sub">{sub}</span>}

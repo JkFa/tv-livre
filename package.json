@@ -9,18 +9,22 @@
     "dev": "vite",
     "data": "tsx scripts/build-data.ts",
     "data:quick": "tsx scripts/build-data.ts --no-probe",
+    "epg": "tsx scripts/build-epg.ts run",
+    "epg:coverage": "tsx scripts/epg-coverage.ts",
     "build": "tsc -b && vite build",
     "preview": "vite preview --port 4173 --strictPort",
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "check": "npm run lint && npm run typecheck && npm test"
+    "check": "npm run lint && npm run typecheck && npm test",
+    "build:pages": "tsx scripts/build-pages.ts"
   },
   "dependencies": {
     "@tanstack/react-virtual": "^3.14.26",
     "hls.js": "^1.7.4",
     "lucide-react": "^1.68.0",
+    "qrcode-generator": "^1.4.4",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },

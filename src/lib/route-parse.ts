@@ -29,6 +29,25 @@ export function parseHash(hash: string): Route {
   return { name: 'home' };
 }
 
+/**
+ * Rota a partir do endereço inteiro. A página estática de um canal (`/tv-livre/canal/br/<slug>/`) leva no <head> o canal
+ * (`<meta name="tvlivre:canal" content="BR/id">`): é ele que diz qual canal abrir, sem o app precisar conhecer slugs.
+ * Um hash (#/...) sempre vence o caminho, então navegar dentro do app continua pelo hash.
+ */
+export function parseLocation(pathname: string, hash: string, base: string, canalMeta: string | null): Route {
+  if (hash.replace(/^#/, '')) return parseHash(hash); // inclui '#/': o "Início" explícito não reabre o canal da página
+  const rest = pathname.startsWith(base) ? pathname.slice(base.length) : pathname.replace(/^\//, '');
+  const parts = rest.split('/').filter(Boolean);
+  if (parts[0] === 'canal' && parts.length === 3 && canalMeta) {
+    const i = canalMeta.indexOf('/');
+    const country = canalMeta.slice(0, i);
+    const id = canalMeta.slice(i + 1);
+    // o país do caminho tem de bater com o da página (proteção contra meta de outra página)
+    if (i > 0 && id && country.toLowerCase() === (parts[1] ?? '').toLowerCase()) return { name: 'channel', country, id };
+  }
+  return parseHash(hash);
+}
+
 export function channelHref(country: string, id: string): string {
   return `#/canal/${encodeURIComponent(country)}/${encodeURIComponent(id)}`;
 }

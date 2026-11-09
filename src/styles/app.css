@@ -131,7 +131,7 @@
 }
 
 /* dial: o controle remoto */
-.dial { display: grid; grid-template-columns: 72px 1fr 52px 72px; align-items: stretch; height: 56px; border-bottom: 1px solid var(--rule); background: var(--surface); }
+.dial { display: grid; grid-template-columns: 72px 1fr 52px 52px 72px; align-items: stretch; height: 56px; border-bottom: 1px solid var(--rule); background: var(--surface); }
 .dial button { display: flex; align-items: center; justify-content: center; gap: 2px; color: var(--text); }
 .dial button:hover:not(:disabled) { background: var(--raised); }
 .dial button:active:not(:disabled) { transform: translateY(1px); }
@@ -140,7 +140,7 @@
 .dial-now { display: flex; align-items: center; gap: var(--s-3); min-width: 0; padding: 0 var(--s-2); border-inline: 1px solid var(--rule); }
 .dial-now .num { font-size: 34px; color: var(--accent-text); }
 .dial-name { font-weight: 700; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dial-fav { border-right: 1px solid var(--rule); }
+.dial-fav, .dial-share { border-right: 1px solid var(--rule); }
 .dial-fav.on { color: var(--accent-text); }
 .now { display: none; }
 
@@ -241,7 +241,7 @@
 
 /* ===== tablet: mais ar na grade ===== */
 @media (min-width: 600px) {
-  .dial { grid-template-columns: 96px 1fr 60px 96px; height: 60px; }
+  .dial { grid-template-columns: 96px 1fr 60px 60px 96px; height: 60px; }
   .row { }
 }
 
@@ -270,7 +270,7 @@
   .osd-name { font-size: 20px; }
   .problem { padding: var(--s-6); gap: var(--s-3); }
   .problem h3 { font-size: 24px; }
-  .dial { grid-template-columns: 120px 1fr 64px 120px; height: 64px; border: 1px solid var(--rule); border-top: 0; }
+  .dial { grid-template-columns: 120px 1fr 64px 64px 120px; height: 64px; border: 1px solid var(--rule); border-top: 0; }
   .dial-now .num { font-size: 40px; }
   .dial-name { font-size: 18px; }
   .dial-side .num { font-size: 28px; }
@@ -302,6 +302,59 @@
 .vlc-alt { margin: var(--s-2) 0 0; font-size: 14px; color: #bdb29d; }
 .vlc-alt .link-btn { color: #ff7b5f; }
 
+/* ---- guia de programação (Agora / A seguir) ---- */
+.prog { display: block; height: 3px; background: var(--rule); overflow: hidden; flex: none; width: 44px; }
+.prog i { display: block; height: 100%; background: var(--accent); transform-origin: left center; }
+.prog-lg { width: 100%; height: 4px; }
+.row-now { display: flex; align-items: center; gap: var(--s-2); font-size: 13px; line-height: 1.25; color: var(--text); min-width: 0; }
+.row-now-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.guide { display: grid; gap: 6px; padding: var(--s-3) var(--s-4); border-bottom: 1px solid var(--rule); font-size: 15px; line-height: 1.3; }
+.guide p { margin: 0; display: flex; gap: var(--s-2); align-items: baseline; min-width: 0; }
+.guide b { font-weight: 800; flex: none; }
+.guide-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.guide-time { color: var(--muted); font-variant-numeric: tabular-nums; flex: none; margin-left: auto; }
+.guide-next { color: var(--muted); }
+.osd-name { flex-direction: column; justify-content: center; }
+.osd-prog { display: block; font-weight: 500; font-size: 0.78em; color: #bdb29d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile-prog { display: block; font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.guide-tv { position: absolute; left: 0; right: 0; bottom: 0; background: #15110e; color: #f1e9d8; border: 0; border-top: 3px solid var(--accent); padding: 16px 40px 22px; pointer-events: none; animation: guide-tv 6s var(--ease-in) both; }
+.guide-tv .guide-time, .guide-tv .guide-next { color: #bdb29d; }
+.guide-tv .prog { background: #3b342b; }
+@keyframes guide-tv { 0% { transform: translateY(16px); opacity: 0; } 5% { transform: none; opacity: 1; } 90% { transform: none; opacity: 1; } 100% { transform: translateY(8px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .guide-tv { animation-name: guide-tv-fade; } }
+@keyframes guide-tv-fade { 0% { opacity: 0; } 5%, 90% { opacity: 1; } 100% { opacity: 0; } }
+html[data-tv='on'] .guide-tv { font-size: 28px; padding-right: min(52vw, 740px); }
+html[data-tv='on'] .guide-tv .prog-lg { height: 8px; }
+html[data-tv='on'] .row-now { font-size: 20px; }
+html[data-tv='on'] .prog { width: 96px; height: 6px; }
+html[data-tv='on'] .guide:not(.guide-tv) { display: none; }
+
+/* ---- páginas estáticas de canal/categoria/país (visíveis antes do app carregar e sem JavaScript) ---- */
+.seo-page { max-width: 640px; margin: 0 auto; padding: var(--s-8) var(--s-5); background: var(--bg); color: var(--text); min-height: 100dvh; }
+.seo-page article { display: grid; gap: var(--s-4); }
+.seo-page h1 { font: 850 clamp(28px, 6vw, 44px)/1.05 var(--font-display); font-stretch: 112%; letter-spacing: -0.01em; margin: 0; }
+.seo-page h2 { font: 800 20px/1.2 var(--font-display); margin: var(--s-4) 0 0; }
+.seo-page p { margin: 0; }
+.seo-kicker, .seo-nav { color: var(--muted); font-size: 14px; }
+.seo-kicker a, .seo-nav a { color: var(--accent-text); }
+.seo-num { font-size: clamp(96px, 28vw, 160px); line-height: 0.8; color: var(--accent-text); }
+.seo-page ul { list-style: none; margin: 0; padding: 0; display: grid; }
+.seo-page li { border-bottom: 1px solid var(--rule); }
+.seo-page li a { display: flex; gap: var(--s-3); align-items: baseline; padding: var(--s-3) 0; min-height: 44px; }
+.seo-page li .num { font-size: 24px; color: var(--muted); min-width: 40px; }
+.seo-page .btn { justify-self: start; }
+
+/* ---- compartilhar ---- */
+.share { display: grid; gap: var(--s-4); font-size: 16px; }
+.share p { margin: 0; }
+.share-text { background: var(--raised); padding: var(--s-3) var(--s-4); border-left: 3px solid var(--accent); overflow-wrap: anywhere; }
+.share-link { color: var(--muted); font-size: 15px; overflow-wrap: anywhere; }
+.qr { width: min(320px, 70vw); height: auto; justify-self: center; background: #fff; }
+.qr-wait { aspect-ratio: 1; }
+html[data-tv='on'] .share { font-size: 26px; }
+html[data-tv='on'] .qr { width: min(480px, 60vh); }
+html[data-tv='on'] .share-link { font-size: 22px; }
+.tv-foot-actions { display: flex; gap: var(--s-4); flex-wrap: wrap; }
 /* ---- transmitir para a TV ---- */
 .cast-panel { position: absolute; inset: 0; z-index: 6; background: #15110e; color: #f1e9d8; display: grid; align-content: center; justify-items: center; gap: var(--s-2); padding: var(--s-2) var(--s-3); text-align: center; overflow-y: auto; }
 .cast-kicker { display: inline-flex; gap: var(--s-2); align-items: center; font-size: 15px; color: #bdb29d; margin: 0; }

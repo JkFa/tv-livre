@@ -43,16 +43,17 @@ export function initTvMode(): void {
 }
 
 // ---------------- teclas do controle remoto ----------------
-export type RemoteKey = 'up' | 'down' | 'left' | 'right' | 'ok' | 'back' | 'chup' | 'chdown' | 'red' | 'green' | 'yellow' | 'blue';
+export type RemoteKey = 'up' | 'down' | 'left' | 'right' | 'ok' | 'back' | 'chup' | 'chdown' | 'red' | 'green' | 'yellow' | 'blue' | 'info';
 
 const BY_KEY: Record<string, RemoteKey> = {
   ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', Enter: 'ok',
   Escape: 'back', GoBack: 'back', BrowserBack: 'back',
   ChannelUp: 'chup', ChannelDown: 'chdown', PageUp: 'chup', PageDown: 'chdown',
   ColorF0Red: 'red', ColorF1Green: 'green', ColorF2Yellow: 'yellow', ColorF3Blue: 'blue',
+  Info: 'info', Guide: 'info',
 };
 // Tizen e webOS ainda mandam só o código numérico para várias teclas
-const BY_CODE: Record<number, RemoteKey> = { 461: 'back', 10009: 'back', 427: 'chup', 428: 'chdown', 403: 'red', 404: 'green', 405: 'yellow', 406: 'blue' };
+const BY_CODE: Record<number, RemoteKey> = { 461: 'back', 10009: 'back', 427: 'chup', 428: 'chdown', 403: 'red', 404: 'green', 405: 'yellow', 406: 'blue', 457: 'info' };
 
 export function remoteKey(e: Pick<KeyboardEvent, 'key' | 'keyCode'>): RemoteKey | null {
   return BY_KEY[e.key] ?? BY_CODE[e.keyCode] ?? null;

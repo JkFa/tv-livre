@@ -4,7 +4,8 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: '17 6 * * *' # todo dia, 06:17 UTC (03:17 em Brasília)
+    - cron: '17 6 * * *' # completa: dados + teste de links + guia (03:17 em Brasília)
+    - cron: '17 18 * * *' # só o guia de programação, sem testar links (15:17 em Brasília)
   workflow_dispatch:
 
 permissions:
@@ -17,6 +18,8 @@ concurrency:
 
 env:
   SITE_URL: https://jkfa.github.io/tv-livre
+  # A execução das 18:17 UTC só renova o guia: não testa links (reaproveita o status da publicação anterior).
+  EPG_ONLY: ${{ github.event.schedule == '17 18 * * *' }}
 
 jobs:
   build:
@@ -38,15 +41,36 @@ jobs:
       # Baixa as duas fontes, une, filtra, testa os links e grava public/data.
       # Falha (e portanto NÃO publica) se uma fonte estiver fora do ar ou se o total cair mais de 50%.
       - name: Pipeline de dados
+        if: env.EPG_ONLY != 'true'
         run: npm run data
+
+      - name: 'Pipeline de dados (só o guia: sem testar links, reaproveita o status anterior)'
+        if: env.EPG_ONLY == 'true'
+        run: npm run data -- --reuse-health
+
+      # Guia de programação (EPG) com o iptv-org/epg. É OPCIONAL: se a coleta falhar ou demorar demais, o
+      # deploy continua sem o guia (ou com o último guia ainda válido) e o motivo aparece como aviso no resumo.
+      - name: Guia de programação (EPG)
+        continue-on-error: true
+        timeout-minutes: 40
+        run: |
+          git clone --depth 1 https://github.com/iptv-org/epg.git "$RUNNER_TEMP/epg"
+          (cd "$RUNNER_TEMP/epg" && HUSKY=0 npm ci --no-audit --no-fund)
+          npm run epg -- --epg-dir "$RUNNER_TEMP/epg"
 
       - name: Build
         run: npm run build
 
+      # Páginas estáticas indexáveis (um HTML por canal elegível, categorias, países, prévias OG e sitemap).
+      # As prévias são renderizadas com o Chromium do Playwright.
+      - name: Navegadores do Playwright
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Páginas indexáveis e sitemap
+        run: npm run build:pages
+
       - name: 'Testes de ponta a ponta (Playwright em Chromium e WebKit; Android, iPhone e desktop emulados)'
-        run: |
-          npx playwright install --with-deps chromium webkit
-          npm run test:e2e
+        run: npm run test:e2e
 
       - uses: actions/configure-pages@v6
 

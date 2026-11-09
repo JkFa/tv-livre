@@ -13,11 +13,13 @@ import { VisitChip } from './components/Visits.tsx';
 import { MoreSheet } from './components/MoreSheet.tsx';
 import { OfflineBar, Toast, UpdateBar } from './components/Notices.tsx';
 import { Player, type Neighbor } from './components/Player.tsx';
+import { ShareSheet, type ShareData } from './components/ShareSheet.tsx';
 import { ShortcutsDialog } from './components/ShortcutsDialog.tsx';
 import { SmartTvSheet } from './components/SmartTvSheet.tsx';
 import { avisoPulo, podeTransmitir, proximoTransmissivel } from './lib/cast.ts';
 import { readTotal, registerVisit, shouldCount } from './lib/counter.ts';
 import { loadCountries, loadIndex } from './lib/data.ts';
+import { agora, comecandoAgora, nowSec, useEpgCountries, useEpgVersion, useGuideClock } from './lib/epg.ts';
 import { compareForDisplay, EMPTY_FILTERS, filterChannels, suggestAlternatives, type Filters } from './lib/filter.ts';
 import { categoryLabel, countryName, languageName, STATUS_LABELS } from './lib/labels.ts';
 import { useFavorites, useRecents, type ChannelRef } from './lib/library.ts';
@@ -28,6 +30,7 @@ import { captureInstallPrompt, useInstall, useOnline } from './lib/pwa.ts';
 import { channelHref, navigate, parseHash, useRoute } from './lib/router.ts';
 import { readString, writeString } from './lib/storage.ts';
 import { fetchRegion, type Region } from './lib/region.ts';
+import { channelShareLink, loadPaginas, peekSlug, shareText } from './lib/share.ts';
 import { useShortcuts } from './lib/shortcuts.ts';
 import { applyTv, getTvPref, resolveTv, setTvPref, type TvPref } from './lib/tvmode.ts';
 import { useCast } from './lib/useCast.ts';
@@ -51,7 +54,8 @@ export default function App() {
   const [store, setStore] = useState<Record<string, Channel[]>>({});
   const [armed, setArmed] = useState(false);
   const [playing, setPlaying] = useState(false);
-  const [sheet, setSheet] = useState<null | 'filters' | 'more' | 'help' | 'tv'>(null);
+  const [sheet, setSheet] = useState<null | 'filters' | 'more' | 'help' | 'tv' | 'share'>(null);
+  const [shareData, setShareData] = useState<ShareData | null>(null);
   const [theme, setThemeState] = useState<ThemePref>(() => getTheme());
   const [toast, setToast] = useState<string | null>(null);
   const [visits, setVisits] = useState<number | null>(null);
@@ -84,7 +88,7 @@ export default function App() {
   });
 
   /** Cada folha só fecha a si mesma: o evento `close` assíncrono de uma folha que acabou de fechar não pode fechar a próxima. */
-  const closeSheet = useCallback((which: 'filters' | 'more' | 'help' | 'tv') => setSheet((s) => (s === which ? null : s)), []);
+  const closeSheet = useCallback((which: 'filters' | 'more' | 'help' | 'tv' | 'share') => setSheet((s) => (s === which ? null : s)), []);
 
   const say = useCallback((msg: string) => {
     setToast(msg);
@@ -137,6 +141,10 @@ export default function App() {
     return [...set];
   }, [index, isHome, homeCountry, view, effectiveCountry, favorites, recents, routeCountry, last]);
 
+  useEpgCountries(needed, index?.epg);
+  const epgVersion = useEpgVersion();
+  const guideTick = useGuideClock([], filters.startingNow ? 60_000 : 3_600_000);
+
   const missingKey = needed.filter((c) => !(c in store)).join(',');
   useEffect(() => {
     if (!missingKey) return;
@@ -175,7 +183,15 @@ export default function App() {
     return out;
   }, [view, effectiveCountry, store, favorites, recents]);
 
-  const visible = useMemo(() => filterChannels(baseList, { ...filters, query: deferredQuery }), [baseList, filters, deferredQuery]);
+  const visible = useMemo(
+    () => {
+      const t = nowSec();
+      return filterChannels(baseList, { ...filters, query: deferredQuery }, { startingNow: (c) => !!comecandoAgora(c, t) });
+    },
+    // epgVersion e guideTick: o filtro "Começando agora" depende do guia carregado e do relógio
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [baseList, filters, deferredQuery, epgVersion, guideTick],
+  );
 
   const selected = useMemo(
     () => (route.name === 'channel' ? (store[route.country]?.find((c) => c.id === route.id) ?? null) : null),
@@ -280,6 +296,26 @@ export default function App() {
     (document.activeElement as HTMLElement | null)?.blur?.();
   }, []);
 
+  // ---- compartilhar: Web Share API quando existe; senão a folha (WhatsApp, Telegram, copiar) ou, na TV, o QR code ----
+  // a lista de páginas do país carrega antes (ao sintonizar), porque o compartilhamento do sistema precisa acontecer no mesmo gesto do toque
+  const selectedCountry = selected?.country;
+  useEffect(() => {
+    if (selectedCountry) void loadPaginas(selectedCountry);
+  }, [selectedCountry]);
+  const startShare = useCallback(() => {
+    if (!selected) return say('Sintonize um canal para compartilhar.');
+    const link = channelShareLink(selected, peekSlug(selected), new URL(import.meta.env.BASE_URL, window.location.origin).href);
+    const input = { name: selected.name, number: formatNumber(numbers.get(channelKey(selected))), program: agora(selected)?.title, link };
+    const data: ShareData = { name: selected.name, link, text: shareText(input), textNoLink: shareText(input, false) };
+    setShareData(data);
+    if (!tv && typeof navigator.share === 'function') {
+      navigator.share({ title: selected.name, text: data.text }).catch((e: unknown) => {
+        if (!(e instanceof DOMException && e.name === 'AbortError')) setSheet('share'); // recusou: usa a folha
+      });
+      return;
+    }
+    setSheet('share');
+  }, [selected, numbers, tv, say]);
   const changeModo = useCallback((m: ModoAudio) => {
     setModoAudio(m);
     setModoState(m);
@@ -292,6 +328,7 @@ export default function App() {
     toggleHelp: () => setSheet((s) => (s === 'help' ? null : 'help')),
     tuneNumber,
     toggleTv: () => changeTvPref(tv ? 'desligado' : 'ligado'),
+    share: startShare,
     toggleRadio: () => changeModo(modo === 'radio' ? 'normal' : 'radio'),
   });
   useTvRemote({
@@ -335,8 +372,14 @@ export default function App() {
   };
 
   useEffect(() => {
+    // páginas estáticas de categoria/país: o título indexado fica como está
+    if (route.name === 'home' && !window.location.hash && document.querySelector('meta[name="tvlivre:estatica"]')) return;
+    // na página estática do canal (/canal/br/slug/) o título é o mesmo que o Google indexou
+    const staticRef = document.querySelector<HTMLMetaElement>('meta[name="tvlivre:canal"]')?.content;
     document.title = selected
-      ? `${formatNumber(numbers.get(channelKey(selected)))} ${selected.name} — TV Livre`
+      ? staticRef === `${selected.country}/${selected.id}`
+        ? `${selected.name} ao vivo — canal ${formatNumber(numbers.get(channelKey(selected)))} | TV Livre`
+        : `${formatNumber(numbers.get(channelKey(selected)))} ${selected.name} — TV Livre`
       : route.name === 'about'
         ? 'Sobre — TV Livre'
         : route.name === 'install'
@@ -401,6 +444,7 @@ export default function App() {
   if (filters.category) chips.push({ label: categoryLabel(filters.category), clear: () => setFilters({ ...filters, category: '' }) });
   if (filters.language) chips.push({ label: languageName(filters.language), clear: () => setFilters({ ...filters, language: '' }) });
   if (filters.status) chips.push({ label: STATUS_LABELS[filters.status], clear: () => setFilters({ ...filters, status: '' }) });
+  if (filters.startingNow) chips.push({ label: 'Começando agora', clear: () => setFilters({ ...filters, startingNow: false }) });
   if (filters.listen) chips.push({ label: 'Bom para ouvir', clear: () => setFilters({ ...filters, listen: false }) });
   if (filters.playableOnly) chips.push({ label: 'Só no navegador', clear: () => setFilters({ ...filters, playableOnly: false }) });
 
@@ -568,6 +612,7 @@ export default function App() {
                 onPick={tune}
                 onPlayingChange={setPlaying}
                 digits={digits}
+                onShare={startShare}
                 cast={cast}
                 onAviso={say}
                 modo={modo}
@@ -676,7 +721,10 @@ export default function App() {
                   <li><kbd className="k-yellow">●</kbd> buscar</li>
                   <li><kbd className="k-blue">●</kbd> filtros</li>
                 </ul>
-                <button type="button" className="link-btn" onClick={() => changeTvPref('desligado')}>Sair do modo TV</button>
+                <span className="tv-foot-actions">
+                  <button type="button" className="link-btn" onClick={startShare} data-testid="tv-share">Abrir no celular (QR)</button>
+                  <button type="button" className="link-btn" onClick={() => changeTvPref('desligado')}>Sair do modo TV</button>
+                </span>
               </footer>
             )}
           </aside>
@@ -710,6 +758,7 @@ export default function App() {
       <SmartTvSheet open={sheet === 'tv'} onClose={() => closeSheet('tv')} numero={selected ? formatNumber(numbers.get(channelKey(selected))) : null} />
       <MoreSheet open={sheet === 'more'} onClose={() => closeSheet('more')} onSmartTv={() => setSheet('tv')} modo={modo} onModo={changeModo} theme={theme} onTheme={changeTheme} onShortcuts={() => setSheet('help')} tvPref={tvPref} onTvPref={changeTvPref} dataDate={dataDate} />
       <ShortcutsDialog open={sheet === 'help'} onClose={() => closeSheet('help')} />
+      <ShareSheet open={sheet === 'share'} onClose={() => closeSheet('share')} data={shareData} tv={tv} />
 
       {needRefresh && !updateDismissed && (
         <UpdateBar playing={playing} onUpdate={() => void updateServiceWorker(true)} onDismiss={() => setUpdateDismissed(true)} />

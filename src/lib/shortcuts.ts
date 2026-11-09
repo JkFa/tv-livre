@@ -7,11 +7,12 @@ interface Handlers {
   toggleHelp: () => void;
   tuneNumber: (n: number) => void;
   toggleTv: () => void;
+  share: () => void;
   /** Alterna o modo Rádio (só áudio). */
   toggleRadio: () => void;
 }
 
-export const sendPlayerCommand = (cmd: 'fullscreen' | 'mute' | 'pip' | 'playpause'): void => {
+export const sendPlayerCommand = (cmd: 'fullscreen' | 'mute' | 'pip' | 'playpause' | 'info'): void => {
   document.dispatchEvent(new CustomEvent('tvlivre:cmd', { detail: cmd }));
 };
 
@@ -22,7 +23,7 @@ function isEditable(t: EventTarget | null): boolean {
 
 /**
  * Atalhos do desktop: ←/→/↑/↓ trocam de canal · Z zapeia · / busca · F tela cheia · M mudo · P PiP ·
- * Espaço pausa · R alterna o Rádio · 0–9 + Enter digitam o número do canal · ? mostra os atalhos.
+ * Espaço pausa · S compartilha o canal · R alterna o Rádio · 0–9 + Enter digitam o número do canal · ? mostra os atalhos.
  * Devolve o que o usuário está digitando (para mostrar na tela).
  */
 export function useShortcuts(handlers: Handlers): string {
@@ -87,6 +88,9 @@ export function useShortcuts(handlers: Handlers): string {
         case 't':
         case 'T':
           return h.current.toggleTv();
+        case 's':
+        case 'S':
+          return h.current.share();
         case 'r':
         case 'R':
           return h.current.toggleRadio();

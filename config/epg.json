@@ -1,0 +1,9 @@
+{
+  "$comment": "Guia de programação (EPG). paises: países com guia coletado. sites: se não vazio, só estes sites do iptv-org/epg são usados. Falha na coleta nunca bloqueia a publicação.",
+  "paises": ["BR", "US", "DE", "SE", "IT", "IN"],
+  "sites": [],
+  "dias": 2,
+  "conexoes": 8,
+  "timeoutRequisicaoMs": 15000,
+  "timeoutTotalMinutos": 25
+}

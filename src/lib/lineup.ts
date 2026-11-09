@@ -1,16 +1,8 @@
 import type { Channel } from '../../shared/types.ts';
 import { caps, isPlayableHere } from './playback.ts';
 
-/**
- * "Grade": cada país tem uma numeração estável de canais. A ordem não depende de filtros nem de status:
- * canais curados do Free-TV primeiro, depois ordem alfabética. Só muda quando a lista de canais muda.
- */
-export function lineupOrder(list: readonly Channel[]): Channel[] {
-  return [...list].sort(
-    (a, b) =>
-      Number(b.sources[0] === 'free-tv') - Number(a.sources[0] === 'free-tv') || a.name.localeCompare(b.name, 'pt-BR'),
-  );
-}
+export { lineupOrder, formatNumber } from '../../shared/lineup.ts';
+import { lineupOrder } from '../../shared/lineup.ts';
 
 export const channelKey = (c: Pick<Channel, 'id' | 'country'>): string => `${c.country}/${c.id}`;
 
@@ -20,10 +12,6 @@ export function buildNumbers(store: Record<string, Channel[]>): Map<string, numb
     lineupOrder(list).forEach((c, i) => numbers.set(channelKey(c), i + 1));
   }
   return numbers;
-}
-
-export function formatNumber(n: number | undefined): string {
-  return n === undefined ? '--' : String(n).padStart(2, '0');
 }
 
 /**

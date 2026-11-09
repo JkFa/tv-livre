@@ -54,8 +54,13 @@ export function About({ visits }: { visits: number | null }) {
           colaborativa de canais públicos e seu banco de metadados (países, categorias, idiomas, logos), em domínio
           público (Unlicense).
         </li>
+        <li>
+          <a href="https://github.com/iptv-org/epg" target="_blank" rel="noopener noreferrer">iptv-org/epg</a>: coletor do guia
+          de programação (&quot;Agora&quot; e &quot;A seguir&quot;), em domínio público. Os horários vêm de grades públicas de
+          terceiros e podem conter erros ou mudar de última hora; nem todo canal tem guia.
+        </li>
       </ul>
-      <p>Obrigado às duas comunidades por manter essas listas.</p>
+      <p>Obrigado às comunidades por manter essas listas.</p>
 
       <h2>Como funciona</h2>
       <ul>

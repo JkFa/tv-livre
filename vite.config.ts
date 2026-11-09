@@ -57,7 +57,8 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,woff2,svg,webmanifest}', 'icons/*.png'],
         globIgnores: ['data/**', 'screenshots/**', 'splash/**', 'og.png', '404.html'],
         navigateFallback: `${BASE}index.html`,
-        navigateFallbackDenylist: [/^\/tv-livre\/data\//],
+        // páginas estáticas de canal/categoria/país (geradas depois do build) não podem virar o index.html do app
+        navigateFallbackDenylist: [/^\/tv-livre\/data\//, /^\/tv-livre\/(canal|categoria|pais)\//],
         cleanupOutdatedCaches: true,
         clientsClaim: true,
         // sem skipWaiting automático: a atualização só entra quando o usuário aceita ("Atualizar")
@@ -72,6 +73,20 @@ export default defineConfig({
             options: {
               cacheName: 'tvlivre-dados',
               expiration: { maxEntries: 250, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheableResponse: { statuses: [200] },
+            },
+          },
+          {
+            // páginas estáticas de canal/categoria/país: rede primeiro (sempre a versão nova quando há internet);
+            // o cache só serve sem conexão ou se a rede demorar mais de 4 s, e vence em 3 dias
+            // ATENÇÃO: serializada para dentro do service worker; não pode referenciar variáveis de fora.
+            urlPattern: ({ url, request, sameOrigin }: { url: URL; request: Request; sameOrigin: boolean }) =>
+              sameOrigin && request.mode === 'navigate' && /^\/tv-livre\/(canal|categoria|pais)\//.test(url.pathname),
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'tvlivre-paginas',
+              networkTimeoutSeconds: 4,
+              expiration: { maxEntries: 40, maxAgeSeconds: 60 * 60 * 24 * 3 },
               cacheableResponse: { statuses: [200] },
             },
           },

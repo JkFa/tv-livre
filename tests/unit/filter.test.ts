@@ -85,3 +85,18 @@ describe('rotas por hash', () => {
     expect(parseHash('#/canal/%E0%A4%A/x')).toEqual({ name: 'home' });
   });
 });
+
+describe('filtro "Começando agora"', () => {
+  const list = [
+    { id: 'a', name: 'A', country: 'BR', categories: [], languages: [], url: 'https://x/a.m3u8', kind: 'hls', status: 'online', sources: ['iptv-org'] },
+    { id: 'b', name: 'B', country: 'BR', categories: [], languages: [], url: 'https://x/b.m3u8', kind: 'hls', status: 'online', sources: ['iptv-org'] },
+  ] as Channel[];
+  it('só deixa os canais que o guia diz que estão começando', () => {
+    const ctx = { startingNow: (c: Channel) => c.id === 'b' };
+    expect(filterChannels(list, { ...EMPTY_FILTERS, startingNow: true }, ctx).map((c) => c.id)).toEqual(['b']);
+  });
+  it('desligado não olha o guia; ligado sem guia não deixa ninguém passar', () => {
+    expect(filterChannels(list, EMPTY_FILTERS, { startingNow: () => false })).toHaveLength(2);
+    expect(filterChannels(list, { ...EMPTY_FILTERS, startingNow: true })).toEqual([]);
+  });
+});

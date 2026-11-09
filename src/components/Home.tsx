@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { ArrowRight, Keyboard, Monitor, Power, Shuffle, Smartphone, Star, Tv } from 'lucide-react';
 import type { Channel, DataIndex } from '../../shared/types.ts';
+import { comecandoAgora, nowSec, useEpgVersion, useGuideClock } from '../lib/epg.ts';
 import { liveNow, parseChannelNumber, pickFeatured, topCategories, topCountries } from '../lib/home.ts';
 import { categoryLabel, countryName } from '../lib/labels.ts';
 import { channelKey, formatNumber } from '../lib/lineup.ts';
@@ -56,6 +57,21 @@ export function Home(p: Props) {
 
   const featured = useMemo(() => pickFeatured(channels, p.resume, new Date(), undefined, nudge), [channels, p.resume, nudge]);
   const live = useMemo(() => liveNow(channels, 8), [channels]);
+  // "Começando agora": programas que acabaram de começar ou começam em 15 min (só com guia carregado)
+  const epgVersion = useEpgVersion();
+  const guideTick = useGuideClock([], 60_000);
+  const starting = useMemo(() => {
+    const t = nowSec();
+    const out: { c: Channel; title: string }[] = [];
+    for (const c of channels) {
+      if (c.status === 'offline') continue;
+      const p = comecandoAgora(c, t);
+      if (p) out.push({ c, title: p.title });
+    }
+    out.sort((a, b) => Number(b.c.status === 'online') - Number(a.c.status === 'online'));
+    return out.slice(0, 8);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channels, epgVersion, guideTick]);
   const cats = useMemo(() => topCategories(channels, 8), [channels]);
   const countries = useMemo(() => topCountries(index, country, 12), [index, country]);
   const num = (c: Channel) => formatNumber(numbers.get(channelKey(c)));
@@ -177,6 +193,12 @@ export function Home(p: Props) {
           </Rail>
         )}
 
+        {starting.length > 0 && (
+          <Rail title={`Começando agora · ${countryLabel}`}>
+            {starting.map(({ c, title }) => <Tile key={channelKey(c)} c={c} n={num(c)} onTune={p.onTune} prog={title} />)}
+          </Rail>
+        )}
+
         <Rail
           title={`No ar agora · ${countryLabel}`}
           action={<a className="link-btn" href="#/canais">Ver os {nf.format(channels.length)} canais <ArrowRight size={14} aria-hidden="true" className="inline-icon" /></a>}
@@ -280,7 +302,7 @@ function Rail({ title, action, busy = false, children }: { title: string; action
   );
 }
 
-function Tile({ c, n, onTune, showCountry = false, star = false }: { c: Channel; n: string; onTune: (c: Channel) => void; showCountry?: boolean; star?: boolean }) {
+function Tile({ c, n, onTune, showCountry = false, star = false, prog }: { c: Channel; n: string; onTune: (c: Channel) => void; showCountry?: boolean; star?: boolean; prog?: string }) {
   const cat = c.categories[0] ? categoryLabel(c.categories[0]) : null;
   const meta = [cat, showCountry ? countryName(c.country) : null].filter(Boolean).join(' · ');
   return (
@@ -289,6 +311,7 @@ function Tile({ c, n, onTune, showCountry = false, star = false }: { c: Channel;
         <span className="tile-num num">{n}</span>
         <span className="tile-body">
           <span className="tile-name">{c.name}</span>
+          {prog && <span className="tile-prog">{prog}</span>}
           <span className="tile-meta">
             <StatusMark status={c.status} withText={c.status !== 'online'} />
             {star && <Star size={13} aria-hidden="true" className="tile-star" />}
