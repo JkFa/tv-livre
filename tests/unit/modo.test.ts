@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  bomParaOuvir, ConsumoSessao, conexaoFraca, escolherNivel, formatarMB, mbPorHora, textoConsumo, type Nivel,
+  bomParaOuvir, ConsumoSessao, conexaoFraca, escolherNivel, formatarMB, mbPorHora, pickVarianteAudio, textoConsumo, type Nivel,
 } from '../../src/lib/modo.ts';
 import { fimDoTimer, formatarRestante, getTimerPadrao, OPCOES_TIMER, passoTimer, RAMPA_MS, rotuloTimer, setTimerPadrao, volumeDoTimer } from '../../src/lib/timer.ts';
 
@@ -33,6 +33,21 @@ describe('escolherNivel', () => {
   });
   it('empate de bitrate fica com o primeiro', () => {
     expect(escolherNivel([v(300_000), v(300_000)], 'economico').index).toBe(0);
+  });
+});
+
+describe('pickVarianteAudio (o hls.js remove essas variantes de hls.levels)', () => {
+  const vid = (b: number, url: string) => ({ bitrate: b, audioCodec: 'mp4a.40.2', videoCodec: 'avc1.42c014', width: 320, height: 180, url });
+  const aud = (b: number, url: string) => ({ bitrate: b, audioCodec: 'mp4a.40.2', url });
+  it('pega a de menor bitrate entre as só de áudio', () => {
+    expect(pickVarianteAudio([vid(510_000, 'v0'), aud(96_000, 'a1'), vid(235_000, 'v1'), aud(52_800, 'a2')])).toEqual({ url: 'a2', bitrate: 52_800 });
+  });
+  it('sem variante só de áudio: null (o Rádio usa o menor vídeo)', () => {
+    expect(pickVarianteAudio([vid(510_000, 'v0'), vid(235_000, 'v1')])).toBeNull();
+    expect(pickVarianteAudio([])).toBeNull();
+  });
+  it('não confunde: sem codec de áudio, com resolução ou sem endereço não é variante de áudio', () => {
+    expect(pickVarianteAudio([{ bitrate: 50_000, url: 'x' }, { bitrate: 50_000, audioCodec: 'mp4a.40.2', width: 10, height: 10, url: 'y' }, { bitrate: 50_000, audioCodec: 'mp4a.40.2', url: '' }])).toBeNull();
   });
 });
 

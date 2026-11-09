@@ -2,7 +2,7 @@ import { useEffect, useRef, type RefObject } from 'react';
 import type { HlsConfig, LoaderCallbacks, LoaderConfiguration, LoaderContext } from 'hls.js';
 import type { Channel } from '../../shared/types.ts';
 import { diagnose, type Cause, type HlsErrorLike } from '../lib/diagnose.ts';
-import { escolherNivel, type InfoConsumo, type ModoAudio } from '../lib/modo.ts';
+import { escolherNivel, pickVarianteAudio, type InfoConsumo, type ModoAudio } from '../lib/modo.ts';
 import { buildPlan, caps as readCaps, isHttpUrl, setHttpOk, toHttps, type Engine, type Step } from '../lib/playback.ts';
 
 export type StageState =
@@ -235,12 +235,40 @@ export function HlsStage({ channel, force = false, active, attempt, muted, video
         }
         fail(diagnose(d, cb.current.channel), `${data.type} / ${data.details}`);
       });
-      inst.on(Ctor.Events.MANIFEST_PARSED, () => {
-        aplicarModo(inst, modoRef.current, cb.current.onInfo);
+      // Rádio: o hls.js tira as variantes só de áudio de `levels`; lemos do manifesto bruto (MANIFEST_LOADED) e recarregamos a
+      // fonte nela. O MANIFEST_PARSED do próprio hls.js vem ANTES do nosso handler de MANIFEST_LOADED, então decidimos só
+      // quando os dois já aconteceram (e sem baixar trecho nenhum antes: autoStartLoad está desligado).
+      let variantesAudio: { url: string; bitrate: number } | null = null;
+      let usandoAudio = false;
+      let carregou = false;
+      let analisou = false;
+      const decidir = () => {
+        if (!carregou || !analisou) return;
+        carregou = analisou = false;
+        if (radio && variantesAudio && !usandoAudio) {
+          usandoAudio = true;
+          const a = variantesAudio;
+          cb.current.onInfo?.({ nativo: false, bitrate: a.bitrate, semVarianteAudio: false, audioOnly: true });
+          setTimeout(() => {
+            if (!disposed && hls === inst) inst.loadSource(a.url);
+          }, 0);
+          return;
+        }
+        if (!usandoAudio) aplicarModo(inst, modoRef.current, cb.current.onInfo);
         inst.startLoad(-1);
         void tryPlay();
+      };
+      inst.on(Ctor.Events.MANIFEST_LOADED, (_e, d) => {
+        if (radio && !usandoAudio) variantesAudio = pickVarianteAudio(d.levels);
+        carregou = true;
+        decidir();
+      });
+      inst.on(Ctor.Events.MANIFEST_PARSED, () => {
+        analisou = true;
+        decidir();
       });
       inst.on(Ctor.Events.LEVEL_SWITCHED, (_e, d) => {
+        if (usandoAudio) return; // a lista de mídia da variante de áudio não declara bitrate; mantemos o da mestra
         const l = inst.levels[d.level];
         if (l) cb.current.onInfo?.({ nativo: false, bitrate: nivelDe(l).bitrate, semVarianteAudio: escolherNivel(inst.levels.map(nivelDe), 'radio').semVarianteAudio, audioOnly: nivelDe(l).audioOnly });
       });

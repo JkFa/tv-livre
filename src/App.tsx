@@ -22,6 +22,7 @@ import { compareForDisplay, EMPTY_FILTERS, filterChannels, suggestAlternatives, 
 import { categoryLabel, countryName, languageName, STATUS_LABELS } from './lib/labels.ts';
 import { useFavorites, useRecents, type ChannelRef } from './lib/library.ts';
 import { buildNumbers, channelKey, findByNumber, formatNumber, pickShuffle, stepChannel } from './lib/lineup.ts';
+import { getModoAudio, setModoAudio, type ModoAudio } from './lib/modo.ts';
 import { applyTheme, getLastChannel, getTheme, setLastChannel, setTheme, type ThemePref } from './lib/prefs.ts';
 import { captureInstallPrompt, useInstall, useOnline } from './lib/pwa.ts';
 import { channelHref, navigate, parseHash, useRoute } from './lib/router.ts';
@@ -58,6 +59,7 @@ export default function App() {
   const [updateDismissed, setUpdateDismissed] = useState(false);
   const [tvPref, setTvPrefState] = useState<TvPref>(() => getTvPref());
   const [guideOpen, setGuideOpen] = useState(false);
+  const [modo, setModoState] = useState<ModoAudio>(() => getModoAudio());
   const [focusReq, setFocusReq] = useState(0);
   const tv = resolveTv(tvPref);
   const cast = useCast(tv);
@@ -278,6 +280,11 @@ export default function App() {
     (document.activeElement as HTMLElement | null)?.blur?.();
   }, []);
 
+  const changeModo = useCallback((m: ModoAudio) => {
+    setModoAudio(m);
+    setModoState(m);
+  }, []);
+
   const digits = useShortcuts({
     zap,
     shuffle,
@@ -285,6 +292,7 @@ export default function App() {
     toggleHelp: () => setSheet((s) => (s === 'help' ? null : 'help')),
     tuneNumber,
     toggleTv: () => changeTvPref(tv ? 'desligado' : 'ligado'),
+    toggleRadio: () => changeModo(modo === 'radio' ? 'normal' : 'radio'),
   });
   useTvRemote({
     enabled: tv && !isDoc && !!index,
@@ -393,6 +401,7 @@ export default function App() {
   if (filters.category) chips.push({ label: categoryLabel(filters.category), clear: () => setFilters({ ...filters, category: '' }) });
   if (filters.language) chips.push({ label: languageName(filters.language), clear: () => setFilters({ ...filters, language: '' }) });
   if (filters.status) chips.push({ label: STATUS_LABELS[filters.status], clear: () => setFilters({ ...filters, status: '' }) });
+  if (filters.listen) chips.push({ label: 'Bom para ouvir', clear: () => setFilters({ ...filters, listen: false }) });
   if (filters.playableOnly) chips.push({ label: 'Só no navegador', clear: () => setFilters({ ...filters, playableOnly: false }) });
 
   const empty = (
@@ -561,6 +570,8 @@ export default function App() {
                 digits={digits}
                 cast={cast}
                 onAviso={say}
+                modo={modo}
+                onModo={changeModo}
               />
             )}
             {iosBar}
@@ -697,7 +708,7 @@ export default function App() {
         />
       )}
       <SmartTvSheet open={sheet === 'tv'} onClose={() => closeSheet('tv')} numero={selected ? formatNumber(numbers.get(channelKey(selected))) : null} />
-      <MoreSheet open={sheet === 'more'} onClose={() => closeSheet('more')} onSmartTv={() => setSheet('tv')} theme={theme} onTheme={changeTheme} onShortcuts={() => setSheet('help')} tvPref={tvPref} onTvPref={changeTvPref} dataDate={dataDate} />
+      <MoreSheet open={sheet === 'more'} onClose={() => closeSheet('more')} onSmartTv={() => setSheet('tv')} modo={modo} onModo={changeModo} theme={theme} onTheme={changeTheme} onShortcuts={() => setSheet('help')} tvPref={tvPref} onTvPref={changeTvPref} dataDate={dataDate} />
       <ShortcutsDialog open={sheet === 'help'} onClose={() => closeSheet('help')} />
 
       {needRefresh && !updateDismissed && (

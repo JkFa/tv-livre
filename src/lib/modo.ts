@@ -60,6 +60,27 @@ export function escolherNivel(niveis: readonly Nivel[], modo: ModoAudio): Escolh
   return { index: m, audioOnly: !!niveis[m]?.audioOnly, semVarianteAudio: false };
 }
 
+/**
+ * Variante só de áudio de menor bitrate da lista mestra. O hls.js REMOVE essas variantes de `hls.levels` quando há
+ * variantes de vídeo, então ela é lida dos níveis brutos (MANIFEST_LOADED) e a fonte é recarregada nela.
+ */
+export interface NivelBruto {
+  bitrate: number;
+  audioCodec?: string | undefined;
+  videoCodec?: string | undefined;
+  width?: number | undefined;
+  height?: number | undefined;
+  url: string;
+}
+export function pickVarianteAudio(levels: readonly NivelBruto[]): { url: string; bitrate: number } | null {
+  let best: NivelBruto | null = null;
+  for (const l of levels) {
+    if (!l.audioCodec || l.videoCodec || (l.width && l.height) || !l.url) continue;
+    if (!best || l.bitrate < best.bitrate) best = l;
+  }
+  return best ? { url: best.url, bitrate: best.bitrate } : null;
+}
+
 // ---------------- consumo ----------------
 /** Megabytes (10^6 bytes) por hora de um fluxo de `bitrate` bits por segundo. */
 export const mbPorHora = (bitrate: number): number => (bitrate * 3600) / 8 / 1_000_000;

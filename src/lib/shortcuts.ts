@@ -7,6 +7,8 @@ interface Handlers {
   toggleHelp: () => void;
   tuneNumber: (n: number) => void;
   toggleTv: () => void;
+  /** Alterna o modo Rádio (só áudio). */
+  toggleRadio: () => void;
 }
 
 export const sendPlayerCommand = (cmd: 'fullscreen' | 'mute' | 'pip' | 'playpause'): void => {
@@ -20,7 +22,7 @@ function isEditable(t: EventTarget | null): boolean {
 
 /**
  * Atalhos do desktop: ←/→/↑/↓ trocam de canal · Z zapeia · / busca · F tela cheia · M mudo · P PiP ·
- * Espaço pausa · 0–9 + Enter digitam o número do canal · ? mostra os atalhos.
+ * Espaço pausa · R alterna o Rádio · 0–9 + Enter digitam o número do canal · ? mostra os atalhos.
  * Devolve o que o usuário está digitando (para mostrar na tela).
  */
 export function useShortcuts(handlers: Handlers): string {
@@ -85,6 +87,9 @@ export function useShortcuts(handlers: Handlers): string {
         case 't':
         case 'T':
           return h.current.toggleTv();
+        case 'r':
+        case 'R':
+          return h.current.toggleRadio();
         case 'f':
         case 'F':
           return sendPlayerCommand('fullscreen');

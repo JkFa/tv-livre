@@ -9,7 +9,10 @@ import { castMedia, podeTransmitir } from '../lib/cast.ts';
 import { copyText } from '../lib/clipboard.ts';
 import { diagnoseCast } from '../lib/diagnose.ts';
 import type { CastController } from '../lib/useCast.ts';
-import { programaAgora } from '../lib/programa.ts';
+import { programaAgora, temGuia } from '../lib/programa.ts';
+import { ConsumoSessao, conexaoFraca, dicaDadosDispensada, dispensarDicaDados, type InfoConsumo, type ModoAudio } from '../lib/modo.ts';
+import { getTimerPadrao, type OpcaoTimer } from '../lib/timer.ts';
+import { useSleepTimer } from '../lib/useSleepTimer.ts';
 import { useAirPlay, useRemotePlayback } from '../lib/transporte.ts';
 import { categoryLabel, countryFlag, countryName } from '../lib/labels.ts';
 import { CAUSAS_CAST, CAUSES, UNSUPPORTED, type UnsupportedWhy } from '../lib/messages.ts';
@@ -21,6 +24,10 @@ import { useMediaSession, useWakeLock } from '../lib/media.ts';
 import { ChannelBadges, StatusMark } from './Badges.tsx';
 import { CastPanel, type CastErro } from './CastPanel.tsx';
 import { ChannelLogo } from './ChannelLogo.tsx';
+import { DataTip } from './DataTip.tsx';
+import { ModeBar } from './ModeBar.tsx';
+import { RadioScreen } from './RadioScreen.tsx';
+import { TimerSheet } from './TimerSheet.tsx';
 import { HlsStage, type StageState } from './HlsStage.tsx';
 import { Sheet } from './Sheet.tsx';
 import { Mark } from './Mark.tsx';
@@ -55,7 +62,13 @@ interface Props {
   cast: CastController;
   /** Avisos curtos (toast). */
   onAviso: (msg: string) => void;
+  /** Normal, Econômico ou Rádio (preferência `tvlivre:modo-audio`). */
+  modo: ModoAudio;
+  onModo: (m: ModoAudio) => void;
 }
+
+/** Soma dos bytes reais dos trechos baixados nesta sessão (vale para todos os canais até recarregar a página). */
+const consumoSessao = new ConsumoSessao();
 
 type Mode = 'hls' | 'embed' | 'youtube-link' | 'unsupported';
 
@@ -106,6 +119,18 @@ export function Player(props: Props) {
     numeroRef.current = props.number;
   });
   const cast = props.cast;
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [info, setInfo] = useState<InfoConsumo | null>(null);
+  const [sessaoMB, setSessaoMB] = useState(() => consumoSessao.totalMB);
+  const [timerOpen, setTimerOpen] = useState(false);
+  const [dica, setDica] = useState(() => conexaoFraca() && !dicaDadosDispensada());
+  useEffect(() => {
+    if (dica) dispensarDicaDados(); // "uma vez": não volta por 30 dias, mesmo sem o usuário agir
+  }, [dica]);
+  useEffect(() => {
+    const id = setInterval(() => setSessaoMB(consumoSessao.totalMB), 2000);
+    return () => clearInterval(id);
+  }, []);
 
   // Troca de canal: o mesmo elemento <video> e a mesma tela cheia continuam; só o estado do canal reinicia.
   const channelId = channel ? `${channel.country}/${channel.id}` : '';
@@ -117,10 +142,15 @@ export function Player(props: Props) {
     setAttempt(0);
     setForced(false);
     setCopied(false);
+    setInfo(null);
   }
 
   const picked = channel ? pickMode(channel) : null;
   const mode: Mode | null = channel ? (forced ? 'hls' : picked!.mode) : null;
+  // Rádio só existe para canais de vídeo HLS (o YouTube não separa o áudio)
+  const radio = props.modo === 'radio' && mode === 'hls';
+  const modoEfetivo: ModoAudio = mode === 'hls' ? props.modo : 'normal';
+  const mediaEl = (): HTMLMediaElement | null => (radio ? audioRef.current : videoRef.current);
   // transmitindo para a TV: o vídeo local para (nada é baixado no celular) e o celular vira controle remoto
   const castOn = cast.conectado && !!channel;
   const castable = channel ? podeTransmitir(channel) : false;
@@ -178,13 +208,27 @@ export function Player(props: Props) {
   useMediaSession(
     channel && armed ? { title: channel.name, artist: 'TV Livre', logo: channel.logo } : null,
     {
-      play: () => void videoRef.current?.play(),
-      pause: () => videoRef.current?.pause(),
+      play: () => void mediaEl()?.play(),
+      pause: () => mediaEl()?.pause(),
       previous: () => onZap(-1),
       next: () => onZap(1),
     },
   );
-  useWakeLock(hlsActive && state.phase === 'playing' && !paused);
+  // Rádio: a tela pode apagar, então não seguramos o Wake Lock
+  useWakeLock(hlsActive && state.phase === 'playing' && !paused && !radio);
+
+  // timer de desligar: pausa no fim e baixa o volume nos últimos 10 s
+  const timer = useSleepTimer({
+    volume: (v) => {
+      for (const el of [videoRef.current, audioRef.current]) if (el) el.volume = v;
+    },
+    fim: () => {
+      videoRef.current?.pause();
+      audioRef.current?.pause();
+      if (cast.conectado) cast.parar();
+    },
+  });
+  const programaAtual = channel ? programaAgora(channel) : null;
 
   // ---- controles: mostrar/esconder ----
   const poke = useCallback(() => {
@@ -264,11 +308,11 @@ export function Player(props: Props) {
   }, []);
 
   const togglePlay = useCallback(() => {
-    const v = videoRef.current;
+    const v = radio ? audioRef.current : videoRef.current;
     if (!v) return;
     if (v.paused) void v.play().catch(() => undefined);
     else v.pause();
-  }, []);
+  }, [radio]);
   const toggleMute = useCallback(() => {
     setMutedState((m) => {
       saveMuted(!m);
@@ -369,6 +413,10 @@ export function Player(props: Props) {
         className="stage"
         ref={wrapRef}
         data-phase={phaseAttr}
+        data-radio={radio ? 'on' : undefined}
+        data-midia={radio ? 'audio' : 'video'}
+        data-bitrate={info?.bitrate ?? undefined}
+        data-nivel-audio={info?.audioOnly ? 'on' : undefined}
         data-controls={controlsOn || paused || !!errorState || !armed ? 'on' : 'off'}
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
@@ -377,7 +425,7 @@ export function Player(props: Props) {
         onFocus={() => poke()}
         onDoubleClick={() => void toggleFullscreen()}
       >
-        {mode === 'hls' && <HlsStage channel={channel} force={forced} active={hlsActive} attempt={attempt} muted={muted} videoRef={videoRef} onState={setState} onPausedChange={setPaused} nativeOnly={nativeOnly} onEngine={setEngine} />}
+        {mode === 'hls' && <HlsStage channel={channel} force={forced} active={hlsActive} attempt={attempt} muted={muted} videoRef={videoRef} onState={setState} onPausedChange={setPaused} nativeOnly={nativeOnly} onEngine={setEngine} modo={modoEfetivo} audioRef={audioRef} onInfo={setInfo} onBytes={(n) => consumoSessao.add(n)} />}
 
         {mode === 'embed' && embedUrl && (
           <iframe
@@ -390,7 +438,7 @@ export function Player(props: Props) {
         )}
 
         {/* canal sintonizado, ainda sem toque: pôster com o botão de tocar */}
-        {!armed && (mode === 'hls' || mode === 'embed') && (
+        {!armed && !radio && (mode === 'hls' || mode === 'embed') && (
           <div className="poster">
             <TestCard dim />
             <button type="button" className="play-big" onClick={onArm} aria-label={`Tocar ${channel.name}`}>
@@ -476,6 +524,24 @@ export function Player(props: Props) {
           />
         )}
 
+        {radio && !errorState && online && !castOn && (
+          <RadioScreen
+            canal={channel}
+            numero={props.number}
+            programa={programaAtual?.title}
+            armed={armed}
+            tocando={state.phase === 'playing' && !paused}
+            conectando={armed && (state.phase === 'loading' || state.phase === 'reconnecting')}
+            onPlayPause={armed ? togglePlay : onArm}
+            onAnterior={() => onZap(-1)}
+            onProximo={() => onZap(1)}
+            onTimer={() => setTimerOpen(true)}
+            timerAtivo={timer.ativo}
+            restanteMs={timer.restanteMs}
+            onVoltarVideo={() => props.onModo('normal')}
+          />
+        )}
+
         {(castOn || airplay.ativo || remote.ativo) && (
           <CastPanel
             canal={channel}
@@ -551,7 +617,7 @@ export function Player(props: Props) {
                 <ScreenShare size={22} />
               </button>
             )}
-            {mode === 'hls' && pipSupported && (
+            {mode === 'hls' && !radio && pipSupported && (
               <button type="button" className="ctl" onClick={() => void togglePip()} aria-pressed={pipOn} aria-label="Imagem sobre imagem">
                 <PictureInPicture2 size={22} />
               </button>
@@ -564,6 +630,19 @@ export function Player(props: Props) {
       </div>
 
       <Dial {...props} channel={channel} onToggleFavorite={props.onToggleFavorite} />
+      {dica && props.modo === 'normal' && (
+        <DataTip onEscolher={(m) => { setDica(false); props.onModo(m); }} onDispensar={() => setDica(false)} />
+      )}
+      <ModeBar
+        modo={props.modo}
+        onModo={props.onModo}
+        disponivel={mode === 'hls'}
+        info={info}
+        sessaoMB={sessaoMB}
+        timerAtivo={timer.ativo}
+        restanteMs={timer.restanteMs}
+        onTimer={() => setTimerOpen(true)}
+      />
 
       <div className="now">
         <span className="now-num num" aria-hidden="true">{props.number}</span>
@@ -593,6 +672,16 @@ export function Player(props: Props) {
         <ChannelLogo name={channel.name} src={channel.logo} size={56} />
       </div>
       <HttpSheet open={howOpen} onClose={() => setHowOpen(false)} />
+      <TimerSheet
+        open={timerOpen}
+        onClose={() => setTimerOpen(false)}
+        ativo={timer.ativo}
+        restanteMs={timer.restanteMs}
+        padrao={getTimerPadrao()}
+        temPrograma={temGuia() && !!programaAtual}
+        onEscolher={(o: OpcaoTimer) => timer.iniciar(o, programaAtual?.stop)}
+        onCancelar={timer.cancelar}
+      />
       <BraveCastSheet open={braveOpen} onClose={() => setBraveOpen(false)} onContinuar={() => { setBraveOpen(false); void cast.iniciar(); }} />
     </div>
   );
