@@ -49,7 +49,7 @@ export function ControleSheet({ open, onClose, controle: c, tv }: Props) {
             <Qr value={p.link} />
             {p.codigo ? (
               <div className="controle-codigo" data-testid="controle-codigo-bloco">
-                <p className="controle-passo">{tv ? 'Sem câmera? Abra o endereço no celular e digite o código' : '2. Sem câmera? Abra este site no celular, toque em "Controle" e digite o código'}</p>
+                <p className="controle-passo">{tv ? 'Sem câmera? Abra o endereço no celular e digite o código' : '2. Sem câmera? No celular, abra o TV Livre, toque em Mais › Usar este celular como controle e digite o código'}</p>
                 <span className="controle-cod num" data-testid="controle-codigo">{formatarCodigo(p.codigo)}</span>
                 {restante !== null && restante > 0 && <span className="muted small" data-testid="controle-expira">Vale por mais {formatarRestante(restante)}</span>}
               </div>

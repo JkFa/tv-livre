@@ -224,7 +224,9 @@ test.describe('com computador e celular', () => {
     expect(codigo).toMatch(/^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/);
     await expect(tv.getByTestId('controle-expira')).toContainText('Vale por mais');
     const cel = await (await celular(browser)).newPage();
-    await cel.goto('./#/controle');
+    await cel.goto('./#/canais');
+    await cel.locator('nav.bottom-nav').getByRole('button', { name: 'Mais' }).click(); // o caminho de quem não tem câmera
+    await cel.getByTestId('more-usar-controle').click();
     await expect(cel.getByTestId('controle-parear')).toBeVisible();
     await cel.getByTestId('controle-codigo-input').fill('ABCD-EFG0'); // 0 não existe no alfabeto
     await cel.getByTestId('controle-codigo-ok').click();
@@ -316,5 +318,6 @@ test('iPhone (WebKit): pareia pelo broker, troca de canal e reconecta ao voltar 
   await cel.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
   await expect(cel.getByTestId('controle-status')).toHaveText('Conectado', { timeout: 20_000 });
   await cel.getByTestId('controle-proximo').click();
-  await expect.poll(() => numeroNaTv(tv).innerText()).toBe(await cel.getByTestId('controle-numero').innerText());
+  // o número no celular acompanha o do computador (o estado volta pelo broker)
+  await expect.poll(async () => (await numeroNaTv(tv).innerText()) === (await cel.getByTestId('controle-numero').innerText())).toBe(true);
 });

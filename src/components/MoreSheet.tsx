@@ -36,6 +36,11 @@ export function MoreSheet({ open, onClose, theme, onTheme, onShortcuts, onSmartT
           </a>
         </li>
         <li>
+          <a href="#/controle" onClick={onClose} data-testid="more-usar-controle">
+            <Smartphone size={22} aria-hidden="true" /> Usar este celular como controle
+          </a>
+        </li>
+        <li>
           <button type="button" onClick={() => { onClose(); onControle(); }} data-testid="more-controle">
             <Smartphone size={22} aria-hidden="true" /> Controlar pelo celular
           </button>

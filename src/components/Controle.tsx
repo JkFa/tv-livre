@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronLeft, ChevronRight, Delete, Maximize, Pause, Play, Shuffle, Star, Volume2, VolumeX, X } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Delete, Maximize, Pause, Play, Shuffle, Star, Volume2, VolumeX } from 'lucide-react';
 import type { Channel } from '../../shared/types.ts';
 import { loadCountry } from '../lib/data.ts';
 import { EMPTY_FILTERS, filterChannels } from '../lib/filter.ts';
@@ -50,7 +50,7 @@ function Parear({ onPar }: { onPar: (p: Par) => void }) {
   return (
     <main className="remote remote-parear" data-testid="controle-parear">
       <h1>Controle remoto</h1>
-      <p>No computador ou na TV, abra o TV Livre, toque em <b>Mais › Controlar pelo celular</b> (ou aperte <b>C</b>) e escaneie o QR code com a câmera do celular.</p>
+      <p>No computador ou na TV, abra o TV Livre, toque em <b>Mais › Controlar pelo celular</b> (ou aperte <b>C</b>) e escaneie o QR code com a câmera deste celular.</p>
       <p>Sem câmera? Digite o código de 8 caracteres:</p>
       <form onSubmit={enviar} className="remote-codigo-form">
         <label className="sr-only" htmlFor="codigo">Código de 8 caracteres</label>
@@ -102,7 +102,7 @@ function Remoto({ par, onSair }: { par: Par; onSair: () => void }) {
           <button type="button" className="btn btn-accent" onClick={() => cmd({ c: 'canal:proximo' })} data-testid="controle-fora-proximo"><ChevronRight size={18} aria-hidden="true" /> Próximo canal</button>
         </div>
       )}
-      <div className="seg remote-abas" role="tablist" aria-label="Controle">
+      <div className="seg seg-tabs remote-abas" role="tablist" aria-label="Controle">
         {(['controle', 'canais'] as const).map((a) => (
           <button key={a} type="button" role="tab" aria-selected={aba === a} onClick={() => setAba(a)} data-testid={`aba-${a}`}>{a === 'controle' ? 'Controle' : 'Canais'}</button>
         ))}
@@ -232,13 +232,12 @@ function Canais({ estado, onEscolher }: { estado: Estado | null; onEscolher: (c:
   const vistos = useMemo(() => filterChannels(base, { ...EMPTY_FILTERS, query: q }).slice(0, 150), [base, q]);
   return (
     <div className="remote-canais" data-testid="controle-canais">
-      <div className="seg" role="tablist" aria-label="Lista">
+      <div className="seg seg-tabs" role="tablist" aria-label="Lista">
         {(['todos', 'favoritos', 'recentes'] as const).map((a) => <button key={a} type="button" role="tab" aria-selected={vista === a} onClick={() => setVista(a)}>{a === 'todos' ? 'Todos' : a === 'favoritos' ? 'Favoritos' : 'Recentes'}</button>)}
       </div>
       <label className="remote-busca">
         <span className="sr-only">Buscar canal pelo nome</span>
         <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar canal pelo nome" autoComplete="off" autoCorrect="off" spellCheck={false} enterKeyHint="search" data-testid="controle-busca" />
-        {q && <button type="button" className="icon-btn" onClick={() => setQ('')} aria-label="Limpar busca"><X size={18} /></button>}
       </label>
       {lista === null && <p className="muted" role="status">Carregando os canais…</p>}
       <ul className="remote-lista" aria-label={`${vistos.length} canais`}>

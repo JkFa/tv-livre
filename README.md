@@ -43,7 +43,7 @@ O celular vira controle remoto do TV Livre que está tocando no **computador ou 
 
 **Como usar.**
 1. No computador/TV: **Mais › Controlar pelo celular** (ícone de celular no topo, no computador; item no rodapé da grade no Modo TV) ou tecla **C**. Esse clique é o gesto do usuário que libera o som que o navegador exige: **deixe a aba aberta**; o celular controla daqui.
-2. No celular: escaneie o **QR code** com a câmera (abre `#/controle`) ou, sem câmera, abra o site, vá em `#/controle` e digite o **código de 8 caracteres** (alfabeto sem 0, O, 1, I; vale **10 minutos** se ninguém conectar).
+2. No celular: escaneie o **QR code** com a câmera (abre `#/controle`) ou, sem câmera, abra o site no celular, toque em **Mais › Usar este celular como controle** (`#/controle`) e digite o **código de 8 caracteres** (alfabeto sem 0, O, 1, I; vale **10 minutos** se ninguém conectar).
 3. O celular mostra o canal atual (número em destaque, nome, logo, programa se houver guia), **dial ‹ ›** (ou deslizar o topo), **teclado numérico** com Enter, **Zapear**, pausa/play, mudo, favoritar, **tela inteira** (liga o layout de janela inteira do Modo TV no computador) e **volume**. A aba **Canais** tem a grade com logos, busca pelo teclado do celular, favoritos e recentes; tocar num canal abre no computador. Se o canal cair, o celular mostra "Fora do ar no computador" com **Próximo canal**.
 4. No computador, a folha lista os celulares ("📱 Celular conectado · iPhone · agora") com **Desconectar** (até **3** ao mesmo tempo), **Encerrar o controle** (gera QR e código novos e desconecta todos) e **Desligar**. Cada comando mostra a vinheta de troca de canal e o aviso "📱 controle". Reaproveita as mesmas ações do teclado e da TV (`zap`, `tuneNumber`, favoritar…).
 
