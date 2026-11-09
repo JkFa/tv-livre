@@ -101,3 +101,17 @@ describe('filtro de conteúdo adulto', () => {
     expect(isAdultCategory(['news'])).toBe(false);
   });
 });
+
+import { diagnoseCast } from '../../src/lib/diagnose.ts';
+describe('diagnoseCast (erros do receptor do Chromecast)', () => {
+  const on = { status: 'online' as const };
+  it('mapeia os códigos para as mesmas causas do player', () => {
+    expect(diagnoseCast('LOAD_MEDIA_FAILED', on)).toBe('cors');
+    expect(diagnoseCast('LOAD_MEDIA_FAILED', { status: 'offline' })).toBe('offline');
+    expect(diagnoseCast('LOAD_FAILED', { ...on, geo: true })).toBe('geo');
+    expect(diagnoseCast('TIMEOUT', on)).toBe('timeout');
+    expect(diagnoseCast('SESSION_ERROR', on)).toBe('device');
+    expect(diagnoseCast('RECEIVER_UNAVAILABLE', on)).toBe('device');
+    expect(diagnoseCast('ALGO_NOVO', on)).toBe('unknown');
+  });
+});

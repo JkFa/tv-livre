@@ -90,3 +90,22 @@ describe('VLC sem copiar e colar', () => {
     expect(toHttps('http://a.example/http://b')).toBe('https://a.example/http://b');
   });
 });
+
+describe('AirPlay: só HLS nativo (o AirPlay não funciona com MediaSource)', () => {
+  it('troca a tentativa atual para o HLS nativo, mantendo o canal', () => {
+    const c = caps({ nativeHls: true });
+    expect(sig(buildPlan(ch(), c))).toEqual(['hlsjs:https', 'native:https']);
+    expect(sig(buildPlan(ch(), c, { nativeOnly: true }))).toEqual(['native:https']);
+  });
+  it('voltar ao motor anterior = planejar de novo sem nativeOnly', () => {
+    const c = caps({ nativeHls: true });
+    expect(sig(buildPlan(ch(), c, { nativeOnly: false }))).toEqual(sig(buildPlan(ch(), c)));
+  });
+  it('canal sem CORS e HTTP em página HTTPS continuam seguindo as regras do nativo', () => {
+    expect(sig(buildPlan(ch({ cors: false }), caps({ nativeHls: true }), { nativeOnly: true }))).toEqual(['native:https']);
+    expect(sig(buildPlan(ch({ url: 'http://a.example/l.m3u8' }), caps({ nativeHls: true }), { nativeOnly: true }))).toEqual(['native:https', 'native!:http:']);
+  });
+  it('sem HLS nativo no navegador não há o que tentar (o AirPlay nem é oferecido)', () => {
+    expect(buildPlan(ch(), caps({ nativeHls: false }), { nativeOnly: true })).toEqual([]);
+  });
+});

@@ -2,6 +2,18 @@ import type { Cause } from './diagnose.ts';
 
 export type UnsupportedWhy = 'format' | 'cors' | 'headers';
 
+/** Mesmas causas, ditas para quem está transmitindo para a TV (o receptor do Chromecast é quem busca o vídeo). */
+export const CAUSAS_CAST: Partial<Record<Cause, { title: string; text: string }>> = {
+  cors: {
+    title: 'A TV não conseguiu abrir esse canal',
+    text: 'O receptor do Chromecast é mais exigente que o navegador (CORS) ou o servidor do canal está fora do ar. Tente outro canal.',
+  },
+  device: {
+    title: 'A conexão com a TV falhou',
+    text: 'O celular perdeu o contato com o aparelho. Confira se os dois estão na mesma rede Wi-Fi.',
+  },
+};
+
 export const CAUSES: Record<Cause, { title: string; text: string }> = {
   offline: {
     title: 'Esse canal saiu do ar',

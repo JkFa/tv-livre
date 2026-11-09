@@ -1,20 +1,33 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ChevronLeft, ChevronRight, Download, ExternalLink, Maximize, Minimize, Pause, PictureInPicture2, Play, Power,
-  RotateCw, ShieldCheck, Star, Volume2, VolumeX, WifiOff,
+  Airplay, Cast, ChevronLeft, ChevronRight, Download, ExternalLink, Maximize, Minimize, Pause, PictureInPicture2, Play, Power,
+  RotateCw, ScreenShare, ShieldCheck, Star, Volume2, VolumeX, WifiOff,
 } from 'lucide-react';
 import type { Channel } from '../../shared/types.ts';
 import { youtubeEmbedUrl } from '../../shared/youtube.ts';
+import { castMedia, podeTransmitir } from '../lib/cast.ts';
 import { copyText } from '../lib/clipboard.ts';
+import { diagnoseCast } from '../lib/diagnose.ts';
+import type { CastController } from '../lib/useCast.ts';
+import { programaAgora, temGuia } from '../lib/programa.ts';
+import { ConsumoSessao, conexaoFraca, dicaDadosDispensada, dispensarDicaDados, type InfoConsumo, type ModoAudio } from '../lib/modo.ts';
+import { getTimerPadrao, type OpcaoTimer } from '../lib/timer.ts';
+import { useSleepTimer } from '../lib/useSleepTimer.ts';
+import { useAirPlay, useRemotePlayback } from '../lib/transporte.ts';
 import { categoryLabel, countryFlag, countryName } from '../lib/labels.ts';
-import { CAUSES, UNSUPPORTED, type UnsupportedWhy } from '../lib/messages.ts';
+import { CAUSAS_CAST, CAUSES, UNSUPPORTED, type UnsupportedWhy } from '../lib/messages.ts';
 import { getMuted, markSwipeHintSeen, setMuted as saveMuted, swipeHintSeen } from '../lib/prefs.ts';
-import { caps, isPlayableHere, unsupportedReason } from '../lib/playback.ts';
+import { caps, isPlayableHere, unsupportedReason, type Engine } from '../lib/playback.ts';
 import { isTvNow } from '../lib/tvmode.ts';
 import { canAllowInsecure, downloadM3u, platform, siteSettingsAddress, vlcHref } from '../lib/vlc.ts';
 import { useMediaSession, useWakeLock } from '../lib/media.ts';
 import { ChannelBadges, StatusMark } from './Badges.tsx';
+import { CastPanel, type CastErro } from './CastPanel.tsx';
 import { ChannelLogo } from './ChannelLogo.tsx';
+import { DataTip } from './DataTip.tsx';
+import { ModeBar } from './ModeBar.tsx';
+import { RadioScreen } from './RadioScreen.tsx';
+import { TimerSheet } from './TimerSheet.tsx';
 import { HlsStage, type StageState } from './HlsStage.tsx';
 import { Sheet } from './Sheet.tsx';
 import { Mark } from './Mark.tsx';
@@ -45,7 +58,17 @@ interface Props {
   onPick: (c: Channel) => void;
   onPlayingChange: (playing: boolean) => void;
   digits: string;
+  /** Transmissão para Chromecast/Google TV (o SDK só é baixado quando o usuário toca em Transmitir). */
+  cast: CastController;
+  /** Avisos curtos (toast). */
+  onAviso: (msg: string) => void;
+  /** Normal, Econômico ou Rádio (preferência `tvlivre:modo-audio`). */
+  modo: ModoAudio;
+  onModo: (m: ModoAudio) => void;
 }
+
+/** Soma dos bytes reais dos trechos baixados nesta sessão (vale para todos os canais até recarregar a página). */
+const consumoSessao = new ConsumoSessao();
 
 type Mode = 'hls' | 'embed' | 'youtube-link' | 'unsupported';
 
@@ -85,6 +108,29 @@ export function Player(props: Props) {
   const [pipOn, setPipOn] = useState(false);
   const [landscapeHint, setLandscapeHint] = useState(false);
   const [swipeHint, setSwipeHint] = useState(() => !swipeHintSeen() && window.matchMedia('(pointer: coarse)').matches);
+  const [castErro, setCastErro] = useState<CastErro | null>(null);
+  const [braveOpen, setBraveOpen] = useState(false);
+  const [castTentativa, setCastTentativa] = useState(0);
+  const [nativeOnly, setNativeOnly] = useState(false);
+  const [engine, setEngine] = useState<Engine | null>(null);
+  const pickerPendente = useRef(false);
+  const numeroRef = useRef(props.number);
+  useEffect(() => {
+    numeroRef.current = props.number;
+  });
+  const cast = props.cast;
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [info, setInfo] = useState<InfoConsumo | null>(null);
+  const [sessaoMB, setSessaoMB] = useState(() => consumoSessao.totalMB);
+  const [timerOpen, setTimerOpen] = useState(false);
+  const [dica, setDica] = useState(() => conexaoFraca() && !dicaDadosDispensada());
+  useEffect(() => {
+    if (dica) dispensarDicaDados(); // "uma vez": não volta por 30 dias, mesmo sem o usuário agir
+  }, [dica]);
+  useEffect(() => {
+    const id = setInterval(() => setSessaoMB(consumoSessao.totalMB), 2000);
+    return () => clearInterval(id);
+  }, []);
 
   // Troca de canal: o mesmo elemento <video> e a mesma tela cheia continuam; só o estado do canal reinicia.
   const channelId = channel ? `${channel.country}/${channel.id}` : '';
@@ -96,25 +142,93 @@ export function Player(props: Props) {
     setAttempt(0);
     setForced(false);
     setCopied(false);
+    setInfo(null);
   }
 
   const picked = channel ? pickMode(channel) : null;
   const mode: Mode | null = channel ? (forced ? 'hls' : picked!.mode) : null;
-  const hlsActive = mode === 'hls' && armed && online;
-  const playing = hlsActive ? state.phase === 'playing' || state.phase === 'buffering' : mode === 'embed' && armed;
+  // Rádio só existe para canais de vídeo HLS (o YouTube não separa o áudio)
+  const radio = props.modo === 'radio' && mode === 'hls';
+  const modoEfetivo: ModoAudio = mode === 'hls' ? props.modo : 'normal';
+  const mediaEl = (): HTMLMediaElement | null => (radio ? audioRef.current : videoRef.current);
+  // transmitindo para a TV: o vídeo local para (nada é baixado no celular) e o celular vira controle remoto
+  const castOn = cast.conectado && !!channel;
+  const castable = channel ? podeTransmitir(channel) : false;
+  const hlsActive = mode === 'hls' && armed && online && !castOn;
+  const playing = castOn || (hlsActive ? state.phase === 'playing' || state.phase === 'buffering' : mode === 'embed' && armed);
+
+  // AirPlay (Safari) e Remote Playback: o <video> diz se há destino; AirPlay exige HLS nativo, então trocamos o motor
+  const videoLive = mode === 'hls' && armed && online && !castOn;
+  const airplay = useAirPlay(videoRef, videoLive, channelId);
+  const remote = useRemotePlayback(videoRef, videoLive && engine === 'native' && state.phase === 'playing', channelId);
+  const [airplayJaAtivo, setAirplayJaAtivo] = useState(false);
+  if (airplay.ativo !== airplayJaAtivo) {
+    setAirplayJaAtivo(airplay.ativo);
+    if (!airplay.ativo) setNativeOnly(false); // saiu do AirPlay: volta ao motor anterior (hls.js)
+  }
+  useEffect(() => {
+    if (pickerPendente.current && engine === 'native' && state.phase === 'playing') {
+      pickerPendente.current = false;
+      airplay.seletor(); // o navegador pode exigir novo toque; o segundo toque já abre direto
+    }
+  }, [engine, state.phase, airplay]);
+  const onAirPlay = () => {
+    if (engine === 'native') return airplay.seletor();
+    pickerPendente.current = true; // o seletor abre assim que o HLS nativo estiver tocando
+    setNativeOnly(true);
+  };
+
+  // cada troca de canal durante a transmissão é um novo loadMedia
+  useEffect(() => {
+    if (!castOn || !channel || !castable) return;
+    let vivo = true;
+    void (async () => {
+      setCastErro(null);
+      const r = await cast.transmitir(
+        castMedia(channel, numeroRef.current, {
+          programa: programaAgora(channel)?.title,
+          pais: countryName(channel.country),
+          iconUrl: new URL(`${import.meta.env.BASE_URL}icons/icon-512.png`, window.location.href).href,
+        }),
+      );
+      if (!vivo || r.ok) return;
+      const causa = diagnoseCast(r.codigo, channel);
+      const msg = CAUSAS_CAST[causa] ?? CAUSES[causa];
+      setCastErro({ title: msg.title, text: msg.text, detalhe: r.codigo });
+    })();
+    return () => {
+      vivo = false;
+    };
+    // só reage à troca de canal/sessão; o resto é lido no momento
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [castOn, channelId, castable, castTentativa]);
 
   useEffect(() => onPlayingChange(playing && !paused), [playing, paused, onPlayingChange]);
 
   useMediaSession(
     channel && armed ? { title: channel.name, artist: 'TV Livre', logo: channel.logo } : null,
     {
-      play: () => void videoRef.current?.play(),
-      pause: () => videoRef.current?.pause(),
+      play: () => void mediaEl()?.play(),
+      pause: () => mediaEl()?.pause(),
       previous: () => onZap(-1),
       next: () => onZap(1),
     },
   );
-  useWakeLock(hlsActive && state.phase === 'playing' && !paused);
+  // Rádio: a tela pode apagar, então não seguramos o Wake Lock
+  useWakeLock(hlsActive && state.phase === 'playing' && !paused && !radio);
+
+  // timer de desligar: pausa no fim e baixa o volume nos últimos 10 s
+  const timer = useSleepTimer({
+    volume: (v) => {
+      for (const el of [videoRef.current, audioRef.current]) if (el) el.volume = v;
+    },
+    fim: () => {
+      videoRef.current?.pause();
+      audioRef.current?.pause();
+      if (cast.conectado) cast.parar();
+    },
+  });
+  const programaAtual = channel ? programaAgora(channel) : null;
 
   // ---- controles: mostrar/esconder ----
   const poke = useCallback(() => {
@@ -194,11 +308,11 @@ export function Player(props: Props) {
   }, []);
 
   const togglePlay = useCallback(() => {
-    const v = videoRef.current;
+    const v = radio ? audioRef.current : videoRef.current;
     if (!v) return;
     if (v.paused) void v.play().catch(() => undefined);
     else v.pause();
-  }, []);
+  }, [radio]);
   const toggleMute = useCallback(() => {
     setMutedState((m) => {
       saveMuted(!m);
@@ -286,7 +400,9 @@ export function Player(props: Props) {
   }
 
   const why = forced ? undefined : picked!.why;
-  const embedUrl = armed ? youtubeEmbedUrl(channel.youtube) : null;
+  const embedUrl = armed && !castOn ? youtubeEmbedUrl(channel.youtube) : null;
+  const castBotao = mode === 'hls' && castable && cast.botao;
+  const onCast = () => (cast.brave && !cast.sdkPronto ? setBraveOpen(true) : void cast.iniciar());
   const showSpinner = hlsActive && (state.phase === 'loading' || state.phase === 'reconnecting' || state.phase === 'buffering');
   const errorState = hlsActive && state.phase === 'error' ? state : null;
   const phaseAttr = !online && mode === 'hls' ? 'offline' : mode !== 'hls' ? mode : !armed ? 'ready' : state.phase;
@@ -297,6 +413,10 @@ export function Player(props: Props) {
         className="stage"
         ref={wrapRef}
         data-phase={phaseAttr}
+        data-radio={radio ? 'on' : undefined}
+        data-midia={radio ? 'audio' : 'video'}
+        data-bitrate={info?.bitrate ?? undefined}
+        data-nivel-audio={info?.audioOnly ? 'on' : undefined}
         data-controls={controlsOn || paused || !!errorState || !armed ? 'on' : 'off'}
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
@@ -305,7 +425,7 @@ export function Player(props: Props) {
         onFocus={() => poke()}
         onDoubleClick={() => void toggleFullscreen()}
       >
-        {mode === 'hls' && <HlsStage channel={channel} force={forced} active={hlsActive} attempt={attempt} muted={muted} videoRef={videoRef} onState={setState} onPausedChange={setPaused} />}
+        {mode === 'hls' && <HlsStage channel={channel} force={forced} active={hlsActive} attempt={attempt} muted={muted} videoRef={videoRef} onState={setState} onPausedChange={setPaused} nativeOnly={nativeOnly} onEngine={setEngine} modo={modoEfetivo} audioRef={audioRef} onInfo={setInfo} onBytes={(n) => consumoSessao.add(n)} />}
 
         {mode === 'embed' && embedUrl && (
           <iframe
@@ -318,7 +438,7 @@ export function Player(props: Props) {
         )}
 
         {/* canal sintonizado, ainda sem toque: pôster com o botão de tocar */}
-        {!armed && (mode === 'hls' || mode === 'embed') && (
+        {!armed && !radio && (mode === 'hls' || mode === 'embed') && (
           <div className="poster">
             <TestCard dim />
             <button type="button" className="play-big" onClick={onArm} aria-label={`Tocar ${channel.name}`}>
@@ -404,6 +524,43 @@ export function Player(props: Props) {
           />
         )}
 
+        {radio && !errorState && online && !castOn && (
+          <RadioScreen
+            canal={channel}
+            numero={props.number}
+            programa={programaAtual?.title}
+            armed={armed}
+            tocando={state.phase === 'playing' && !paused}
+            conectando={armed && (state.phase === 'loading' || state.phase === 'reconnecting')}
+            onPlayPause={armed ? togglePlay : onArm}
+            onAnterior={() => onZap(-1)}
+            onProximo={() => onZap(1)}
+            onTimer={() => setTimerOpen(true)}
+            timerAtivo={timer.ativo}
+            restanteMs={timer.restanteMs}
+            onVoltarVideo={() => props.onModo('normal')}
+          />
+        )}
+
+        {(castOn || airplay.ativo || remote.ativo) && (
+          <CastPanel
+            canal={channel}
+            numero={props.number}
+            aparelho={castOn ? cast.aparelho : null}
+            tipo={castOn ? 'cast' : airplay.ativo ? 'airplay' : 'remote'}
+            {...(castOn ? { volume: { valor: cast.volume, mudo: cast.mudo, onVolume: (v: number) => void cast.definirVolume(v), onMudo: () => void cast.definirMudo(!cast.mudo) } } : {})}
+            naoTransmite={castOn && !castable}
+            erro={castOn ? castErro : null}
+            onParar={castOn ? cast.parar : airplay.ativo ? airplay.seletor : remote.seletor}
+            onProximo={() => onZap(1)}
+            onTentar={() => setCastTentativa((n) => n + 1)}
+          />
+        )}
+
+        {cast.falhou && !castOn && (
+          <div className="status-chip" role="status">Não foi possível carregar o Chromecast. Confira a internet e se o navegador não bloqueia o Google Cast.</div>
+        )}
+
         {/* vinheta de troca: nasce a cada canal novo (key) e some sozinha por CSS */}
         {armed && (mode === 'embed' || (mode === 'hls' && online && !errorState)) && (
           <div className="osd" key={channel.id} aria-hidden="true">
@@ -445,7 +602,22 @@ export function Player(props: Props) {
               </>
             )}
             <span className="ctl-spacer" />
-            {mode === 'hls' && pipSupported && (
+            {castBotao && (
+              <button type="button" className="ctl" onClick={onCast} aria-pressed={castOn} aria-label={castOn ? 'Transmitindo para a TV' : 'Transmitir para a TV'} title="Transmitir para a TV" data-testid="cast-btn" disabled={cast.carregando}>
+                <Cast size={22} />
+              </button>
+            )}
+            {mode === 'hls' && airplay.disponivel && (
+              <button type="button" className="ctl" onClick={onAirPlay} aria-pressed={airplay.ativo} aria-label="AirPlay" title="AirPlay" data-testid="airplay-btn">
+                <Airplay size={22} />
+              </button>
+            )}
+            {mode === 'hls' && remote.disponivel && !airplay.disponivel && (
+              <button type="button" className="ctl" onClick={() => void remote.seletor()} aria-pressed={remote.ativo} aria-label="Enviar para outra tela" title="Enviar para outra tela" data-testid="remote-btn">
+                <ScreenShare size={22} />
+              </button>
+            )}
+            {mode === 'hls' && !radio && pipSupported && (
               <button type="button" className="ctl" onClick={() => void togglePip()} aria-pressed={pipOn} aria-label="Imagem sobre imagem">
                 <PictureInPicture2 size={22} />
               </button>
@@ -458,6 +630,19 @@ export function Player(props: Props) {
       </div>
 
       <Dial {...props} channel={channel} onToggleFavorite={props.onToggleFavorite} />
+      {dica && props.modo === 'normal' && (
+        <DataTip onEscolher={(m) => { setDica(false); props.onModo(m); }} onDispensar={() => setDica(false)} />
+      )}
+      <ModeBar
+        modo={props.modo}
+        onModo={props.onModo}
+        disponivel={mode === 'hls'}
+        info={info}
+        sessaoMB={sessaoMB}
+        timerAtivo={timer.ativo}
+        restanteMs={timer.restanteMs}
+        onTimer={() => setTimerOpen(true)}
+      />
 
       <div className="now">
         <span className="now-num num" aria-hidden="true">{props.number}</span>
@@ -469,6 +654,9 @@ export function Player(props: Props) {
             <StatusMark status={channel.status} withText />
             <ChannelBadges channel={channel} />
           </p>
+          {mode === 'embed' && cast.suportado && (
+            <p className="now-note" data-testid="cast-youtube">Para transmitir para a TV, use o botão de transmitir do próprio vídeo do YouTube.</p>
+          )}
           {mode === 'embed' && (
             <p className="now-note">
               O vídeo não aparece?{' '}
@@ -484,6 +672,17 @@ export function Player(props: Props) {
         <ChannelLogo name={channel.name} src={channel.logo} size={56} />
       </div>
       <HttpSheet open={howOpen} onClose={() => setHowOpen(false)} />
+      <TimerSheet
+        open={timerOpen}
+        onClose={() => setTimerOpen(false)}
+        ativo={timer.ativo}
+        restanteMs={timer.restanteMs}
+        padrao={getTimerPadrao()}
+        temPrograma={temGuia() && !!programaAtual}
+        onEscolher={(o: OpcaoTimer) => timer.iniciar(o, programaAtual?.stop)}
+        onCancelar={timer.cancelar}
+      />
+      <BraveCastSheet open={braveOpen} onClose={() => setBraveOpen(false)} onContinuar={() => { setBraveOpen(false); void cast.iniciar(); }} />
     </div>
   );
 }
@@ -506,6 +705,24 @@ function VlcOpen({ channel, variant = 'accent' }: { channel: Channel; variant?: 
     <button type="button" className={cls} onClick={() => downloadM3u(channel)} data-testid="vlc-open">
       <Download size={18} aria-hidden="true" /> Abrir no VLC
     </button>
+  );
+}
+
+/** Brave: o Media Router (Cast) vem desligado. Explica como ligar e só então oferece transmitir. */
+function BraveCastSheet({ open, onClose, onContinuar }: { open: boolean; onClose: () => void; onContinuar: () => void }) {
+  return (
+    <Sheet id="brave-cast" open={open} onClose={onClose} title="Transmitir no Brave" variant="modal"
+      footer={<button type="button" className="btn btn-accent" onClick={onContinuar} data-testid="brave-continuar"><Cast size={18} aria-hidden="true" /> Já liguei, transmitir</button>}>
+      <div className="howto" data-testid="brave-passos">
+        <p>O Brave vem com o Chromecast desligado. Para ligar, uma vez só:</p>
+        <ol>
+          <li>Abra <code>brave://settings/extensions</code>.</li>
+          <li>Ative <b>Media Router</b> (Roteador de mídia).</li>
+          <li>Volte aqui, recarregue a página e toque em <b>Transmitir</b> de novo.</li>
+        </ol>
+        <p className="howto-note">Seu celular e a TV precisam estar na mesma rede Wi-Fi.</p>
+      </div>
+    </Sheet>
   );
 }
 

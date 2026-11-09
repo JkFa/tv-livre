@@ -2,7 +2,8 @@ import { useEffect, useRef, type RefObject } from 'react';
 import type { HlsConfig, LoaderCallbacks, LoaderConfiguration, LoaderContext } from 'hls.js';
 import type { Channel } from '../../shared/types.ts';
 import { diagnose, type Cause, type HlsErrorLike } from '../lib/diagnose.ts';
-import { buildPlan, caps as readCaps, isHttpUrl, setHttpOk, toHttps, type Step } from '../lib/playback.ts';
+import { escolherNivel, pickVarianteAudio, type InfoConsumo, type ModoAudio } from '../lib/modo.ts';
+import { buildPlan, caps as readCaps, isHttpUrl, setHttpOk, toHttps, type Engine, type Step } from '../lib/playback.ts';
 
 export type StageState =
   | { phase: 'loading' }
@@ -23,11 +24,37 @@ interface Props {
   videoRef: RefObject<HTMLVideoElement | null>;
   onState: (s: StageState) => void;
   onPausedChange: (paused: boolean) => void;
+  /** AirPlay: só HLS nativo (o AirPlay não funciona com MediaSource). Voltar a `false` restaura o motor anterior. */
+  nativeOnly?: boolean;
+  /** Motor da tentativa em uso (para o player saber se o AirPlay já pode abrir o seletor). */
+  onEngine?: (e: Engine) => void;
+  /** Normal = automático; Econômico = menor vídeo; Rádio = só áudio (usa o <audio>, não o <video>). */
+  modo: ModoAudio;
+  audioRef: RefObject<HTMLAudioElement | null>;
+  /** Nível em uso, para a estimativa honesta de consumo. */
+  onInfo?: (i: InfoConsumo) => void;
+  /** Bytes reais de cada trecho baixado (FRAG_LOADED → stats.loaded). */
+  onBytes?: (n: number) => void;
 }
 
 const MAX_RECONNECTS = 3;
 
 type HlsInstance = import('hls.js').default;
+
+const nivelDe = (l: { bitrate: number; maxBitrate?: number; audioCodec?: string; videoCodec?: string }) => ({
+  bitrate: l.bitrate || l.maxBitrate || 0,
+  audioOnly: !!l.audioCodec && !l.videoCodec,
+});
+
+/** Aplica o modo ao hls.js: Normal = automático; Econômico/Rádio = nível fixo escolhido por `escolherNivel`. */
+export function aplicarModo(inst: HlsInstance, modo: ModoAudio, onInfo?: (i: InfoConsumo) => void): void {
+  const niveis = inst.levels.map(nivelDe);
+  const esc = escolherNivel(niveis, modo);
+  inst.autoLevelCapping = esc.index;
+  inst.currentLevel = esc.index; // -1 = automático
+  const emUso = esc.index >= 0 ? esc.index : inst.currentLevel;
+  onInfo?.({ nativo: false, bitrate: niveis[emUso]?.bitrate || undefined, semVarianteAudio: esc.semVarianteAudio, audioOnly: esc.audioOnly, niveis: niveis.length });
+}
 
 /**
  * Motor de reprodução HLS. Executa o plano de `lib/playback.ts`, uma tentativa depois da outra, sem o usuário ver:
@@ -36,23 +63,32 @@ type HlsInstance = import('hls.js').default;
  *  - autoplay bloqueado não quebra a interface (o vídeo fica pausado e o usuário aperta play);
  *  - cai/volta a rede, ou o app volta do segundo plano → retoma sozinho.
  */
-export function HlsStage({ channel, force = false, active, attempt, muted, videoRef, onState, onPausedChange }: Props) {
-  const cb = useRef({ onState, onPausedChange, channel });
+export function HlsStage({ channel, force = false, active, attempt, muted, videoRef, onState, onPausedChange, nativeOnly = false, onEngine, modo, audioRef, onInfo, onBytes }: Props) {
+  const cb = useRef({ onState, onPausedChange, channel, onEngine, onInfo, onBytes });
+  const modoRef = useRef(modo);
+  const hlsLive = useRef<HlsInstance | null>(null);
   useEffect(() => {
-    cb.current = { onState, onPausedChange, channel };
+    cb.current = { onState, onPausedChange, channel, onEngine, onInfo, onBytes };
+    modoRef.current = modo;
   });
+  const radio = modo === 'radio';
 
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    video.muted = muted;
-  }, [muted, videoRef]);
+    for (const el of [videoRef.current, audioRef.current]) if (el) el.muted = muted;
+  }, [muted, videoRef, audioRef]);
+
+  // Normal ↔ Econômico troca o nível sem recarregar o canal (Rádio troca de elemento, então reinicia pelo efeito principal)
+  useEffect(() => {
+    const inst = hlsLive.current;
+    if (inst?.levels?.length) aplicarModo(inst, modo, cb.current.onInfo);
+  }, [modo]);
 
   const url = channel.url;
   const cors = channel.cors;
   const needsHeaders = channel.needsHeaders;
   useEffect(() => {
-    const video = videoRef.current;
+    // Rádio: o hls.js anexa a um <audio> (o som tem mais chance de continuar com a tela apagada e o app em segundo plano)
+    const video: HTMLMediaElement | null = radio ? audioRef.current : videoRef.current;
     if (!video || !active) return;
 
     let disposed = false;
@@ -120,6 +156,7 @@ export function HlsStage({ channel, force = false, active, attempt, muted, video
     const teardown = () => {
       hls?.destroy();
       hls = null;
+      hlsLive.current = null;
       video.removeAttribute('src');
       video.load();
     };
@@ -166,9 +203,10 @@ export function HlsStage({ channel, force = false, active, attempt, muted, video
         levelLoadingMaxRetry: 1,
         fragLoadingMaxRetry: 2,
         manifestLoadingTimeOut: 15_000,
-        // reduz consumo em 4G: começa pela qualidade mais baixa que caiba na banda
+        // não baixa trecho nenhum antes de aplicarmos o modo (Econômico/Rádio) ao nível escolhido
+        autoStartLoad: false,
         startLevel: -1,
-        capLevelToPlayerSize: true,
+        capLevelToPlayerSize: !radio,
       };
       if (s.upgrade) {
         // lista e trechos: qualquer endereço http: dentro da lista passa a https:
@@ -182,6 +220,7 @@ export function HlsStage({ channel, force = false, active, attempt, muted, video
       }
       const inst = new Ctor(cfg);
       hls = inst;
+      hlsLive.current = inst;
       inst.on(Ctor.Events.ERROR, (_e, data) => {
         if (!data.fatal) return;
         const d = data as HlsErrorLike;
@@ -196,7 +235,44 @@ export function HlsStage({ channel, force = false, active, attempt, muted, video
         }
         fail(diagnose(d, cb.current.channel), `${data.type} / ${data.details}`);
       });
-      inst.on(Ctor.Events.MANIFEST_PARSED, () => void tryPlay());
+      // Rádio: o hls.js tira as variantes só de áudio de `levels`; lemos do manifesto bruto (MANIFEST_LOADED) e recarregamos a
+      // fonte nela. O MANIFEST_PARSED do próprio hls.js vem ANTES do nosso handler de MANIFEST_LOADED, então decidimos só
+      // quando os dois já aconteceram (e sem baixar trecho nenhum antes: autoStartLoad está desligado).
+      let variantesAudio: { url: string; bitrate: number } | null = null;
+      let usandoAudio = false;
+      let carregou = false;
+      let analisou = false;
+      const decidir = () => {
+        if (!carregou || !analisou) return;
+        carregou = analisou = false;
+        if (radio && variantesAudio && !usandoAudio) {
+          usandoAudio = true;
+          const a = variantesAudio;
+          cb.current.onInfo?.({ nativo: false, bitrate: a.bitrate, semVarianteAudio: false, audioOnly: true });
+          setTimeout(() => {
+            if (!disposed && hls === inst) inst.loadSource(a.url);
+          }, 0);
+          return;
+        }
+        if (!usandoAudio) aplicarModo(inst, modoRef.current, cb.current.onInfo);
+        inst.startLoad(-1);
+        void tryPlay();
+      };
+      inst.on(Ctor.Events.MANIFEST_LOADED, (_e, d) => {
+        if (radio && !usandoAudio) variantesAudio = pickVarianteAudio(d.levels);
+        carregou = true;
+        decidir();
+      });
+      inst.on(Ctor.Events.MANIFEST_PARSED, () => {
+        analisou = true;
+        decidir();
+      });
+      inst.on(Ctor.Events.LEVEL_SWITCHED, (_e, d) => {
+        if (usandoAudio) return; // a lista de mídia da variante de áudio não declara bitrate; mantemos o da mestra
+        const l = inst.levels[d.level];
+        if (l) cb.current.onInfo?.({ nativo: false, bitrate: nivelDe(l).bitrate || undefined, niveis: inst.levels.length, semVarianteAudio: escolherNivel(inst.levels.map(nivelDe), 'radio').semVarianteAudio, audioOnly: nivelDe(l).audioOnly });
+      });
+      inst.on(Ctor.Events.FRAG_LOADED, (_e, d) => cb.current.onBytes?.(d.frag.stats.loaded));
       inst.loadSource(s.url);
       inst.attachMedia(video);
     };
@@ -207,7 +283,9 @@ export function HlsStage({ channel, force = false, active, attempt, muted, video
       if (!s) return fail('cors', 'sem forma de tocar neste navegador');
       clearTimeout(loadTimer);
       loadTimer = setTimeout(() => fail('timeout'), s.budgetMs);
+      cb.current.onEngine?.(s.engine);
       if (s.engine === 'native') {
+        cb.current.onInfo?.({ nativo: true, semVarianteAudio: false, audioOnly: false }); // não dá para escolher a qualidade nem medir os bytes
         video.src = s.url;
         void tryPlay();
         return;
@@ -226,7 +304,7 @@ export function HlsStage({ channel, force = false, active, attempt, muted, video
         mse = false; // sem hls.js ainda dá para tentar o HLS nativo
       }
       if (disposed) return;
-      steps = buildPlan({ url, cors, needsHeaders: force ? false : needsHeaders }, { ...capsNow, mse }, { force });
+      steps = buildPlan({ url, cors, needsHeaders: force ? false : needsHeaders }, { ...capsNow, mse }, { force, nativeOnly });
       if (!steps.length) return fail(mse ? 'cors' : 'media', mse ? 'sem forma de tocar neste canal' : 'Este navegador não suporta HLS');
       init();
     })();
@@ -267,7 +345,12 @@ export function HlsStage({ channel, force = false, active, attempt, muted, video
       video.removeEventListener('error', onVideoError);
       teardown();
     };
-  }, [url, cors, needsHeaders, force, active, attempt, videoRef]);
+  }, [url, cors, needsHeaders, force, active, attempt, videoRef, audioRef, nativeOnly, radio]);
 
-  return <video ref={videoRef} playsInline muted={muted} preload="none" aria-label="Vídeo do canal" disablePictureInPicture={false} />;
+  return (
+    <>
+      <video ref={videoRef} playsInline muted={muted} preload="none" aria-label="Vídeo do canal" disablePictureInPicture={false} x-webkit-airplay="allow" />
+      <audio ref={audioRef} preload="none" aria-label="Áudio do canal" hidden />
+    </>
+  );
 }
