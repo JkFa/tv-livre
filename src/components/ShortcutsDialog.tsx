@@ -13,7 +13,8 @@ const ROWS: [string[], string][] = [
   [['S'], 'Compartilhar o canal'],
   [['C'], 'Controlar pelo celular'],
   [['R'], 'Modo Rádio (só áudio)'],
-  [['T'], 'Modo TV (controle remoto)'],
+  [['T'], 'Ligar ou sair do Modo TV'],
+  [['Esc'], 'Sair do Modo TV (no navegador)'],
   [['?'], 'Mostrar esta lista'],
 ];
 

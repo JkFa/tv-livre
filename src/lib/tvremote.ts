@@ -16,6 +16,8 @@ interface Remote {
   toggleFavorite: () => void;
   openFilters: () => void;
   searchGuide: () => void;
+  /** No navegador (modo ligado à mão), Esc/Voltar fora da grade sai do Modo TV. Ausente em TV de verdade, onde Voltar é da TV. */
+  exit?: () => void;
 }
 
 const INTERACTIVE = 'button, a[href], input, select, summary, [role=tab]';
@@ -83,6 +85,12 @@ export function useTvRemote(r: Remote): void {
       if (k === 'yellow') return (c.searchGuide(), handled());
       if (k === 'blue') return (c.openFilters(), handled());
       if (k === 'info') return (sendPlayerCommand('info'), handled()); // mostra Agora / A seguir
+
+      // navegador com o Modo TV ligado à mão: Esc sai (primeiro fecha a grade, se estiver aberta)
+      if (k === 'back' && c.exit && !c.guideOpen && !target?.closest('.problem')) {
+        c.exit();
+        return handled();
+      }
 
       if (c.screen === 'home') {
         if (k === 'up' || k === 'down' || k === 'left' || k === 'right') {
