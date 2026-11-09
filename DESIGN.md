@@ -27,7 +27,7 @@ Evitamos a nostalgia caricata (nada de TV de tubo, chuvisco ou VHS). A única re
 
 ## Tokens
 
-Definidos em `src/styles/tokens.css`. Dois temas (`data-theme="dark|light"`), com `auto` seguindo o sistema.
+Definidos em `src/styles/tokens.css`. Dois temas (`data-theme="dark|light"`), com `auto` seguindo o sistema. **O padrão é o claro** (papel envelhecido), mesmo com o sistema no escuro: só quem escolhe "escuro" ou "automático" muda isso. O ícone de alternar tema (lua no claro, sol no escuro) fica sempre na barra do topo, também no celular, com alvo de 44 px.
 
 | Token | Escuro ("preto quente") | Claro ("papel envelhecido") | Uso |
 |---|---|---|---|

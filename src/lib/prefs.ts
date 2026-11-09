@@ -16,10 +16,14 @@ export function getLastChannel(): ChannelRef | null {
 }
 export const setLastChannel = (ref: ChannelRef): void => void writeJson(LAST_KEY, ref);
 
+/** O padrão é o tema claro; "escuro" e "automático" (segue o sistema) só valem se o usuário os escolheu. */
 export function getTheme(): ThemePref {
   const v = readString(THEME_KEY);
-  return v === 'claro' || v === 'escuro' ? v : 'auto';
+  return v === 'escuro' || v === 'auto' ? v : 'claro';
 }
+
+/** O tema que está na tela agora é o escuro? ("auto" segue o sistema.) */
+export const isDarkNow = (pref: ThemePref): boolean => pref === 'escuro' || (pref === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
 export function applyTheme(pref: ThemePref): void {
   const root = document.documentElement;
   root.dataset.theme = pref === 'claro' ? 'light' : pref === 'escuro' ? 'dark' : 'auto';

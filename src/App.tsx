@@ -25,7 +25,7 @@ import { categoryLabel, countryName, languageName, STATUS_LABELS } from './lib/l
 import { useFavorites, useRecents, type ChannelRef } from './lib/library.ts';
 import { buildNumbers, channelKey, findByNumber, formatNumber, pickShuffle, stepChannel } from './lib/lineup.ts';
 import { getModoAudio, setModoAudio, type ModoAudio } from './lib/modo.ts';
-import { applyTheme, getLastChannel, getTheme, setLastChannel, setTheme, type ThemePref } from './lib/prefs.ts';
+import { applyTheme, getLastChannel, getTheme, isDarkNow, setLastChannel, setTheme, type ThemePref } from './lib/prefs.ts';
 import { captureInstallPrompt, useInstall, useOnline } from './lib/pwa.ts';
 import { channelHref, navigate, parseHash, useRoute } from './lib/router.ts';
 import { readString, writeString } from './lib/storage.ts';
@@ -584,13 +584,16 @@ export default function App() {
           <button type="button" className="icon-btn desktop-only" onClick={() => setSheet('help')} aria-label="Atalhos do teclado" title="Atalhos (?)">
             <Keyboard size={20} />
           </button>
+          {/* visível também no celular (antes só no computador): um toque alterna claro e escuro */}
           <button
             type="button"
-            className="icon-btn desktop-only"
-            onClick={() => changeTheme(document.documentElement.dataset.theme === 'light' || (document.documentElement.dataset.theme === 'auto' && !window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'escuro' : 'claro')}
-            aria-label="Alternar tema claro e escuro"
+            className="icon-btn"
+            onClick={() => changeTheme(isDarkNow(theme) ? 'claro' : 'escuro')}
+            aria-label={isDarkNow(theme) ? 'Mudar para o tema claro' : 'Mudar para o tema escuro'}
+            title={isDarkNow(theme) ? 'Tema claro' : 'Tema escuro'}
+            data-testid="alternar-tema"
           >
-            {theme === 'claro' || (theme === 'auto' && window.matchMedia('(prefers-color-scheme: light)').matches) ? <Moon size={20} /> : <Sun size={20} />}
+            {isDarkNow(theme) ? <Sun size={20} aria-hidden="true" /> : <Moon size={20} aria-hidden="true" />}
           </button>
         </div>
       </header>
