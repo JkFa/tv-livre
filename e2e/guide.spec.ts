@@ -21,6 +21,7 @@ async function uniqueChannel(request: Parameters<typeof brChannels>[0]): Promise
 async function mockGuide(page: Page, request: Parameters<typeof brChannels>[0], entries: EpgFile['channels'][string] | null, opts: { listed?: boolean; ch: Channel }) {
   const idx = await (await request.get('data/index.json')).json();
   if (opts.listed !== false) idx.epg = ['BR'];
+  else delete idx.epg; // o índice real pode já listar o guia (build-epg); aqui ele não lista
   const calls: string[] = [];
   await page.route('**/data/index.json', (r) => r.fulfill({ json: idx }));
   await page.route('**/data/epg/*.json', (r) => {

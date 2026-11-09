@@ -55,7 +55,8 @@ test('página de canal: título, metas, Open Graph e JSON-LD corretos; o app abr
   expect(img.headers()['content-type']).toMatch(/image\//);
 
   // navegar dentro do app continua pelo hash e o "Início" leva à tela inicial (não reabre o canal)
-  await page.getByRole('link', { name: 'Início', exact: true }).first().click();
+  const mobile = !!test.info().project.use.isMobile;
+  await (mobile ? page.locator('nav.bottom-nav').getByRole('button', { name: 'Início' }) : page.getByRole('link', { name: 'Início', exact: true }).first()).click();
   await expect(page.getByTestId('home-ligar')).toBeVisible();
 });
 
