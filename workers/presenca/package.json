@@ -1,0 +1,22 @@
+{
+  "name": "tvlivre-presenca",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Serviço de presença do TV Livre (Cloudflare Worker + Durable Object): só conta conexões.",
+  "scripts": {
+    "dev": "wrangler dev --port 8787",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "deploy": "wrangler deploy",
+    "custos": "node custos.mjs",
+    "carga": "node carga.mjs"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.6.1",
+    "@cloudflare/workers-types": "^5.20261109.1",
+    "typescript": "5.9",
+    "vitest": "^4.1.0",
+    "wrangler": "^4.159.0"
+  }
+}
