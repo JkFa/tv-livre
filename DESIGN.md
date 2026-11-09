@@ -126,6 +126,14 @@ Na TV: sem barras, foco inicial em "Ligar a TV", setas movem o foco, tipografia 
 - **Teclas coloridas** têm legenda no rodapé da grade; a cor só marca a tecla, o texto diz a ação.
 - **Regra de ouro:** ▲▼ nunca ficam sem efeito. Assistindo, trocam de canal; na grade, movem o foco; num painel de erro, movem entre os botões.
 
+## Guia, páginas de canal e compartilhar
+
+- **Guia ("Agora" / "A seguir").** O guia é texto e uma barra, nunca cartão: na grade, uma linha entre o nome e o status (título + barra de 44 px, 3 px de altura); no player, uma faixa de uma coluna sob o dial (rótulos em negrito, hora no fuso de quem assiste em condensado/tabular, barra de 4 px). A barra usa o acento como **preenchimento** e só muda por `transform` (nada anima largura). Sem guia, a linha não existe (nada de "sem informação"). Na vinheta do zapear, o título do programa entra em corpo menor sob o nome.
+- **Modo TV.** A faixa é uma tarja preta com régua de 3 px no acento, fonte de 28 px, que nasce a cada troca de canal e some em 6 s (só `transform` e `opacity`; com `prefers-reduced-motion` vira fade). A tecla **Info** a mostra de novo. Fica sempre na metade esquerda para não ficar sob o painel da grade.
+- **Páginas de canal (`/canal/<pais>/<slug>/`).** Mesmo vocabulário da tela inicial: número enorme no acento, título largo, régua fina, lista de canais relacionados com número à esquerda. Visíveis antes do app carregar e sem JavaScript.
+- **Prévia (OG).** 1200×630, preto quente, barra vertical de acento à esquerda, número gigante em condensado (acento), nome em Archivo expandida, marca no topo. **Sem logo do canal** (mesmos motivos da grade).
+- **Compartilhar.** Botão-tecla ao lado da estrela, no dial (alvo de 52–64 px). Folha modal com o texto que será enviado (régua de acento à esquerda) e três ações; na TV, QR code preto sobre branco (zona silenciosa de 3 módulos) com o endereço por extenso.
+
 ## Paridade com a versão anterior (tag `pre-rebrand`)
 
 Preservado: índice por país e "Todos os países"; busca sem acento por relevância; filtros de categoria, idioma, status e

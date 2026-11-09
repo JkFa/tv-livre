@@ -13,6 +13,7 @@ aplicativo instalável. Sem cadastro, sem anúncios, sem cobrança, e **sem hosp
   HLS nativo do navegador onde o hls.js não existe (Safari do iPhone). YouTube usa o embed oficial.
 - O navegador acessa **diretamente** a fonte do vídeo: não há backend, proxy, retransmissão nem gravação.
 - Interface em português do Brasil, claro e escuro, mobile primeiro.
+- **Guia de programação** ("Agora" e "A seguir"), **páginas indexáveis por canal** (Google e prévia bonita no WhatsApp) e botão **Compartilhar**.
 
 ### A marca: "o controle remoto reinventado"
 
@@ -27,7 +28,7 @@ Detalhes, tokens e regras de movimento em [DESIGN.md](DESIGN.md).
 | Recurso | Como funciona |
 |---|---|
 | Zapear | Dial `‹ 06 · 07 Nome · 08 ›`, deslizar no player (ignora as bordas da tela, que são do sistema), botão central **Zapear**. |
-| Teclado (desktop) | `←` `→` `↑` `↓` trocam de canal · `Z` zapeia · `/` busca · `F` tela cheia · `M` mudo · `P` PiP · `Espaço` pausa · `0–9`+`Enter` digitam o número · `?` lista os atalhos. |
+| Teclado (desktop) | `←` `→` `↑` `↓` trocam de canal · `Z` zapeia · `/` busca · `F` tela cheia · `M` mudo · `P` PiP · `Espaço` pausa · `S` compartilha · `0–9`+`Enter` digitam o número · `?` lista os atalhos. |
 | Mobile | Navegação inferior ao alcance do polegar, filtros em folha inferior, player fixo no topo, `playsinline`, paisagem com player e grade lado a lado e convite para tela cheia. |
 | Plataforma | Picture-in-Picture, Media Session (tela de bloqueio e teclas de mídia trocam de canal) e Wake Lock (tela ligada enquanto toca). |
 | Resiliência | Autoplay só após uma ação do usuário; se o navegador bloquear, a interface continua. Queda de rede ou volta do segundo plano retomam o canal (até 3 tentativas), pulando para o ao vivo. |
@@ -82,6 +83,7 @@ Em navegadores de TV (Samsung/Tizen, LG/webOS, Google TV, Fire TV, Chromecast) o
 | Voltar | (deixa a TV tratar) | fecha a grade |
 | 0–9 | digita o número do canal (OK confirma, ou espera 1,6 s) | idem |
 | Vermelho | favorita o canal atual | |
+| Info | mostra "Agora / A seguir" (também aparece sozinho a cada troca) | |
 | Verde | zapear (sorteia um canal no ar) | |
 | Amarelo | busca | |
 | Azul | filtros | |
@@ -131,6 +133,48 @@ O pipeline também detecta se o servidor envia cabeçalhos **CORS**; sem eles o 
 **Salvaguardas.** O pipeline termina com erro, e portanto **não publica**, se uma fonte estiver fora do ar/inconsistente ou se o
 total de canais cair mais de 50% em relação à publicação anterior.
 
+## Guia de programação (EPG): "Agora" e "A seguir"
+
+Cada canal com guia mostra o programa no ar e o seguinte: na **grade** (título + barra fina de progresso), no **player**
+("Agora: Título · 20h00–21h30", barra e "A seguir: Título · 21h30"), na **vinheta do zapear** e no **Modo TV** (faixa por 6 s a
+cada troca de canal e com a tecla **Info**). O filtro **Começando agora** (programas que começaram há até 10 min ou começam em
+até 15) existe nos filtros e como bloco na tela inicial. Canal sem guia simplesmente não mostra a linha.
+
+| Etapa | Como funciona |
+|---|---|
+| Cobertura | `npm run epg:coverage` cruza a nossa grade com o `guides.json` do iptv-org e imprime, por país, canais, canais com guia, % e os sites coletores necessários. |
+| Coleta | `scripts/build-epg.ts` escolhe, para cada canal com guia, **um** site (o que cobre mais canais do país), gera um `channels.xml` com o `id` da nossa grade como `xmltv_id` e roda o grab do **[iptv-org/epg](https://github.com/iptv-org/epg)** (clonado no workflow) com `--days 2`, tempo total limitado e concorrência controlada (`config/epg.json`). |
+| Conversão | XMLTV → `public/data/epg/<PAÍS>.json` = `{ generatedAt, channels: { [id]: [[início, fim, título, categoria?], …] } }`, horários em **epoch UTC (s)**; só de "agora − 2 h" a "+ 36 h". Parser tolerante (entradas quebradas, fuso `20261109200000 -0300`, entidades HTML duplas). |
+| Orçamento | **≤ 150 KB gzip por país.** Se passar, a janela à frente encolhe (36 → 30 → 24 → 18 → 12 → 8 h) e o aviso aparece no resumo da execução. |
+| Opcional | Se a coleta falhar ou demorar demais, o deploy **continua**, sem guia ou com o último guia ainda válido (canais sem dado novo herdam o do arquivo anterior se ele tiver menos de 48 h). Nunca bloqueia a publicação. |
+| No site | `src/lib/epg.ts` carrega só o país em uso (o índice lista os países com guia em `epg`), com *stale-while-revalidate* no service worker. Arquivo com mais de 48 h é tratado como ausente; entradas vencidas são ignoradas; a faixa se atualiza sozinha no fim do programa (um único temporizador). |
+
+**Horários da publicação** (`deploy.yml`): **06:17 UTC** (03:17 em Brasília) roda tudo: dados, teste de links, guia, build, páginas, E2E e deploy.
+**18:17 UTC** (15:17 em Brasília) renova só o guia: `--reuse-health` não testa nenhum link de vídeo e reaproveita o status da publicação anterior.
+Países com guia: `config/epg.json` (`paises`). Os horários vêm de grades públicas de terceiros e **podem conter erros**; a página Sobre diz isso.
+
+## Páginas indexáveis (SEO)
+
+As rotas do app usam `#` e o Google não as indexa. Depois do `vite build`, `npm run build:pages` (`scripts/build-pages.ts`) gera **HTML estático de verdade**:
+
+| Arquivo | Conteúdo |
+|---|---|
+| `canal/<pais>/<slug>/index.html` | Uma por canal elegível. `<title>`: `{Nome} ao vivo — canal {NN} \| TV Livre`; descrição com país, categoria, idioma e o programa do momento; `canonical`, Open Graph (`pt_BR`) e Twitter Card; JSON-LD `TelevisionChannel`; conteúdo **visível sem JavaScript** (nome, número, país, "Assistir agora" e canais relacionados). Com JavaScript carrega o mesmo app, que abre o player no canal. |
+| `categoria/<slug>/`, `pais/<pais>/` | Listas de canais elegíveis. |
+| `og/<pais>/<slug>.png` ou `.jpg` | Prévia 1200×630: número gigante + nome + marca (DESIGN.md), **sem o logo do canal**. Se o PNG projetar mais de 40 MB, usa JPEG na maior qualidade que cabe. |
+| `data/paginas/<PAÍS>.json` | `{ id: slug }`, lido pelo botão Compartilhar. |
+| `sitemap.xml` | Todas as páginas, com `lastmod`; referenciado no `robots.txt`. |
+
+**Política (`config/seo.json`).** Para reduzir a exposição a reclamações de direitos, **só ganham página** os canais **no ar** cuja fonte principal é o **Free-TV** ou de categoria `public`, `education`, `legislative` ou `religious`. Todos os outros **não** ganham página (continuam no app). `permitir` e `bloquear` aceitam ids (`id` ou `PAÍS/id`; bloquear vence); `"indexar": "nenhum"` publica só os de `permitir`. Canais de `config/removals.json` **nunca** ganham página, nem por `permitir`.
+
+**Slug.** Nome sem acentos, minúsculo, com hífens. Se dois canais do país dão o mesmo slug, todos do grupo ganham o sufixo do id (não depende da ordem).
+**Roteamento.** `/tv-livre/canal/<pais>/<slug>/` é reconhecido por `parseLocation` (`src/lib/route-parse.ts`): a página leva `<meta name="tvlivre:canal" content="BR/id">`, que diz qual canal abrir. O hash sempre vence o caminho, então `#/...` e os atalhos do manifesto continuam iguais e o "Início" sai do canal. As páginas de categoria e de país são só para o Google: com JavaScript o app abre na tela inicial.
+**Service worker.** Essas páginas ficam **fora** do `navigateFallback` (senão virariam o `index.html` do app) e usam *NetworkFirst* (rede primeiro, cache só offline ou após 4 s, vence em 3 dias): uma página nova aparece na recarga seguinte. Há teste E2E disso.
+
+## Compartilhar
+
+Botão **Compartilhar** ao lado da estrela do dial (e tecla **S**). Usa a **Web Share API** quando existe; senão abre uma folha com **WhatsApp**, **Telegram** e **Copiar link**. No Modo TV, o item **Abrir no celular (QR)** do rodapé da grade mostra um **QR code** do link. Texto: `📺 Tô assistindo {Nome} (canal {NN}) ao vivo no TV Livre: {link}` ou, havendo guia, `📺 Agora em {Nome}: {Programa} — {link}`. O link é a **página indexável** do canal quando ela existe e, senão, `#/canal/CC/ID`; nunca leva parâmetros de rastreamento. Nada é enviado a lugar nenhum pelo TV Livre: quem escolhe o destino é o usuário.
+
 ## Executar localmente
 
 Requisitos: Node.js 20.19+ (recomendado 22) e npm.
@@ -147,6 +191,9 @@ Outros comandos:
 npm run data         # pipeline completo, com teste de rede (15–25 min)
 npm run check        # lint + tipos + testes unitários
 npm run build        # tsc + vite build  → dist/ (inclui o service worker)
+npm run build:pages  # páginas indexáveis, prévias OG e sitemap em dist/ (depois do build; usa o Chromium do Playwright)
+npm run epg          # guia de programação (precisa de -- --epg-dir <clone do iptv-org/epg com npm ci>)
+npm run epg:coverage # cobertura do guia por país (tabela)
 npm run preview      # serve dist/ em http://localhost:4173/tv-livre/
 npx playwright install chromium webkit
 npm run test:e2e     # Chromium e WebKit; Pixel 7, iPhone 14, desktop Chrome e Safari (emulação)
@@ -162,9 +209,9 @@ Opções do pipeline (`tsx scripts/build-data.ts …`): `--no-probe`, `--limit N
 
 ## Atualização dos dados e publicação
 
-O workflow [`deploy.yml`](.github/workflows/deploy.yml) roda **a cada push na `main`, uma vez por dia (06:17 UTC) e manualmente**
-(`workflow_dispatch`): lint → tipos → testes unitários → pipeline de dados → build → testes E2E (Playwright) → publicação
-no GitHub Pages com `actions/deploy-pages`. Qualquer etapa que falhe impede a publicação.
+O workflow [`deploy.yml`](.github/workflows/deploy.yml) roda **a cada push na `main`, duas vezes por dia (06:17 UTC completa; 18:17 UTC só o guia) e manualmente**
+(`workflow_dispatch`): lint → tipos → testes unitários → pipeline de dados → guia de programação (opcional) → build → páginas indexáveis → testes E2E (Playwright) → publicação
+no GitHub Pages com `actions/deploy-pages`. Qualquer etapa que falhe impede a publicação, **exceto o guia**, que só gera aviso.
 
 > O GitHub desativa workflows agendados após 60 dias sem atividade no repositório; basta um push ou execução manual para reativar.
 
@@ -176,7 +223,7 @@ adicionado a [`config/removals.json`](config/removals.json) (por id, URL, host o
 ## Estrutura
 
 ```
-scripts/          pipeline de dados (build-data.ts e lib/) + geradores de ativos (make-assets, make-screenshots)
+scripts/          pipeline de dados (build-data.ts e lib/), guia (build-epg.ts, epg-coverage.ts), páginas indexáveis (build-pages.ts) + geradores de ativos (make-assets, make-screenshots)
 shared/           tipos e utilitários usados pelo pipeline e pelo site
 src/brand/        geometria única da marca (moldura aberta + luz de transmissão)
 src/styles/       tokens (claro/escuro), base e componentes
@@ -185,7 +232,7 @@ src/lib/          filtros, grade/zapear, atalhos, preferências, contador, PWA, 
 tests/unit/       testes unitários (Vitest) com playlists reais e malformadas em tests/fixtures/
 e2e/              testes de ponta a ponta (Playwright) e da PWA
 public/           ícones, telas de abertura, capturas, og.png (gerados e versionados)
-config/           lista de remoções
+config/           lista de remoções (removals.json), política de páginas indexáveis (seo.json) e do guia (epg.json)
 ```
 
 Rotas usam *hash* (`#/` tela inicial, `#/canais` player + grade, `#/canal/BR/<id>`, `#/sobre`, `#/instalar`), então recarregar a página nunca gera 404 no GitHub Pages; o
