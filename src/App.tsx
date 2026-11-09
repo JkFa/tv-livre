@@ -13,10 +13,11 @@ import { VisitChip } from './components/Visits.tsx';
 import { MoreSheet } from './components/MoreSheet.tsx';
 import { OfflineBar, Toast, UpdateBar } from './components/Notices.tsx';
 import { Player, type Neighbor } from './components/Player.tsx';
+import { ShareSheet, type ShareData } from './components/ShareSheet.tsx';
 import { ShortcutsDialog } from './components/ShortcutsDialog.tsx';
 import { readTotal, registerVisit, shouldCount } from './lib/counter.ts';
 import { loadCountries, loadIndex } from './lib/data.ts';
-import { comecandoAgora, nowSec, useEpgCountries, useEpgVersion, useGuideClock } from './lib/epg.ts';
+import { agora, comecandoAgora, nowSec, useEpgCountries, useEpgVersion, useGuideClock } from './lib/epg.ts';
 import { compareForDisplay, EMPTY_FILTERS, filterChannels, suggestAlternatives, type Filters } from './lib/filter.ts';
 import { categoryLabel, countryName, languageName, STATUS_LABELS } from './lib/labels.ts';
 import { useFavorites, useRecents, type ChannelRef } from './lib/library.ts';
@@ -26,6 +27,7 @@ import { captureInstallPrompt, useInstall, useOnline } from './lib/pwa.ts';
 import { channelHref, navigate, parseHash, useRoute } from './lib/router.ts';
 import { readString, writeString } from './lib/storage.ts';
 import { fetchRegion, type Region } from './lib/region.ts';
+import { channelShareLink, loadPaginas, peekSlug, shareText } from './lib/share.ts';
 import { useShortcuts } from './lib/shortcuts.ts';
 import { applyTv, getTvPref, resolveTv, setTvPref, type TvPref } from './lib/tvmode.ts';
 import { useTvRemote } from './lib/tvremote.ts';
@@ -48,7 +50,8 @@ export default function App() {
   const [store, setStore] = useState<Record<string, Channel[]>>({});
   const [armed, setArmed] = useState(false);
   const [playing, setPlaying] = useState(false);
-  const [sheet, setSheet] = useState<null | 'filters' | 'more' | 'help'>(null);
+  const [sheet, setSheet] = useState<null | 'filters' | 'more' | 'help' | 'share'>(null);
+  const [shareData, setShareData] = useState<ShareData | null>(null);
   const [theme, setThemeState] = useState<ThemePref>(() => getTheme());
   const [toast, setToast] = useState<string | null>(null);
   const [visits, setVisits] = useState<number | null>(null);
@@ -275,6 +278,27 @@ export default function App() {
     (document.activeElement as HTMLElement | null)?.blur?.();
   }, []);
 
+  // ---- compartilhar: Web Share API quando existe; senão a folha (WhatsApp, Telegram, copiar) ou, na TV, o QR code ----
+  // a lista de páginas do país carrega antes (ao sintonizar), porque o compartilhamento do sistema precisa acontecer no mesmo gesto do toque
+  const selectedCountry = selected?.country;
+  useEffect(() => {
+    if (selectedCountry) void loadPaginas(selectedCountry);
+  }, [selectedCountry]);
+  const startShare = useCallback(() => {
+    if (!selected) return say('Sintonize um canal para compartilhar.');
+    const link = channelShareLink(selected, peekSlug(selected), new URL(import.meta.env.BASE_URL, window.location.origin).href);
+    const input = { name: selected.name, number: formatNumber(numbers.get(channelKey(selected))), program: agora(selected)?.title, link };
+    const data: ShareData = { name: selected.name, link, text: shareText(input), textNoLink: shareText(input, false) };
+    setShareData(data);
+    if (!tv && typeof navigator.share === 'function') {
+      navigator.share({ title: selected.name, text: data.text }).catch((e: unknown) => {
+        if (!(e instanceof DOMException && e.name === 'AbortError')) setSheet('share'); // recusou: usa a folha
+      });
+      return;
+    }
+    setSheet('share');
+  }, [selected, numbers, tv, say]);
+
   const digits = useShortcuts({
     zap,
     shuffle,
@@ -282,6 +306,7 @@ export default function App() {
     toggleHelp: () => setSheet((s) => (s === 'help' ? null : 'help')),
     tuneNumber,
     toggleTv: () => changeTvPref(tv ? 'desligado' : 'ligado'),
+    share: startShare,
   });
   useTvRemote({
     enabled: tv && !isDoc && !!index,
@@ -560,6 +585,7 @@ export default function App() {
                 onPick={tune}
                 onPlayingChange={setPlaying}
                 digits={digits}
+                onShare={startShare}
               />
             )}
             {iosBar}
@@ -664,7 +690,10 @@ export default function App() {
                   <li><kbd className="k-yellow">●</kbd> buscar</li>
                   <li><kbd className="k-blue">●</kbd> filtros</li>
                 </ul>
-                <button type="button" className="link-btn" onClick={() => changeTvPref('desligado')}>Sair do modo TV</button>
+                <span className="tv-foot-actions">
+                  <button type="button" className="link-btn" onClick={startShare} data-testid="tv-share">Abrir no celular (QR)</button>
+                  <button type="button" className="link-btn" onClick={() => changeTvPref('desligado')}>Sair do modo TV</button>
+                </span>
               </footer>
             )}
           </aside>
@@ -697,6 +726,7 @@ export default function App() {
       )}
       <MoreSheet open={sheet === 'more'} onClose={() => setSheet(null)} theme={theme} onTheme={changeTheme} onShortcuts={() => setSheet('help')} tvPref={tvPref} onTvPref={changeTvPref} dataDate={dataDate} />
       <ShortcutsDialog open={sheet === 'help'} onClose={() => setSheet(null)} />
+      <ShareSheet open={sheet === 'share'} onClose={() => setSheet(null)} data={shareData} tv={tv} />
 
       {needRefresh && !updateDismissed && (
         <UpdateBar playing={playing} onUpdate={() => void updateServiceWorker(true)} onDismiss={() => setUpdateDismissed(true)} />

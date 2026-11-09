@@ -161,6 +161,7 @@ if (!args.includes('--no-og') && ogJobs.length) {
 const ext = args.includes('--no-og') ? 'png' : OG_EXT.current;
 
 // ----- grava tudo -----
+for (const [code, list] of byCountry) write(`data/paginas/${code}.json`, JSON.stringify(Object.fromEntries(list.map((p) => [p.ch.id, p.slug]))));
 for (const p of pages) write(`${p.path.slice(1)}index.html`, p.html!.replaceAll('.@EXT@', `.${ext}`));
 for (const l of listings) write(`${l.rel}index.html`, l.html);
 

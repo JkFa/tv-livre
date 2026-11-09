@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ChevronLeft, ChevronRight, Download, ExternalLink, Maximize, Minimize, Pause, PictureInPicture2, Play, Power,
-  RotateCw, ShieldCheck, Star, Volume2, VolumeX, WifiOff,
+  RotateCw, Share2, ShieldCheck, Star, Volume2, VolumeX, WifiOff,
 } from 'lucide-react';
 import type { Channel } from '../../shared/types.ts';
 import { youtubeEmbedUrl } from '../../shared/youtube.ts';
@@ -47,6 +47,7 @@ interface Props {
   onPick: (c: Channel) => void;
   onPlayingChange: (playing: boolean) => void;
   digits: string;
+  onShare: () => void;
 }
 
 type Mode = 'hls' | 'embed' | 'youtube-link' | 'unsupported';
@@ -672,7 +673,7 @@ function Problem({ title, text, detail, tone, icon, actions, extra, suggestions,
   );
 }
 
-function Dial({ channel, number, prev, next, onZap, isFavorite, onToggleFavorite }: Props & { channel: Channel }) {
+function Dial({ channel, number, prev, next, onZap, isFavorite, onToggleFavorite, onShare }: Props & { channel: Channel }) {
   return (
     <div className="dial" role="group" aria-label="Controle de canais">
       <button type="button" className="dial-side" onClick={() => onZap(-1)} aria-label={prev ? `Canal anterior: ${prev.number} ${prev.name}` : 'Canal anterior'} disabled={!prev}>
@@ -685,6 +686,9 @@ function Dial({ channel, number, prev, next, onZap, isFavorite, onToggleFavorite
       </div>
       <button type="button" className={`dial-fav${isFavorite ? ' on' : ''}`} onClick={onToggleFavorite} aria-pressed={isFavorite} aria-label={isFavorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'} title={isFavorite ? 'Remover dos favoritos' : 'Favoritar'}>
         <Star size={22} fill={isFavorite ? 'currentColor' : 'none'} aria-hidden="true" />
+      </button>
+      <button type="button" className="dial-share" onClick={onShare} aria-label="Compartilhar este canal" title="Compartilhar (S)" data-testid="share-btn">
+        <Share2 size={20} aria-hidden="true" />
       </button>
       <button type="button" className="dial-side" onClick={() => onZap(1)} aria-label={next ? `Próximo canal: ${next.number} ${next.name}` : 'Próximo canal'} disabled={!next}>
         <span className="num">{next?.number ?? ''}</span>

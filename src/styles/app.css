@@ -131,7 +131,7 @@
 }
 
 /* dial: o controle remoto */
-.dial { display: grid; grid-template-columns: 72px 1fr 52px 72px; align-items: stretch; height: 56px; border-bottom: 1px solid var(--rule); background: var(--surface); }
+.dial { display: grid; grid-template-columns: 72px 1fr 52px 52px 72px; align-items: stretch; height: 56px; border-bottom: 1px solid var(--rule); background: var(--surface); }
 .dial button { display: flex; align-items: center; justify-content: center; gap: 2px; color: var(--text); }
 .dial button:hover:not(:disabled) { background: var(--raised); }
 .dial button:active:not(:disabled) { transform: translateY(1px); }
@@ -140,7 +140,7 @@
 .dial-now { display: flex; align-items: center; gap: var(--s-3); min-width: 0; padding: 0 var(--s-2); border-inline: 1px solid var(--rule); }
 .dial-now .num { font-size: 34px; color: var(--accent-text); }
 .dial-name { font-weight: 700; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dial-fav { border-right: 1px solid var(--rule); }
+.dial-fav, .dial-share { border-right: 1px solid var(--rule); }
 .dial-fav.on { color: var(--accent-text); }
 .now { display: none; }
 
@@ -241,7 +241,7 @@
 
 /* ===== tablet: mais ar na grade ===== */
 @media (min-width: 600px) {
-  .dial { grid-template-columns: 96px 1fr 60px 96px; height: 60px; }
+  .dial { grid-template-columns: 96px 1fr 60px 60px 96px; height: 60px; }
   .row { }
 }
 
@@ -270,7 +270,7 @@
   .osd-name { font-size: 20px; }
   .problem { padding: var(--s-6); gap: var(--s-3); }
   .problem h3 { font-size: 24px; }
-  .dial { grid-template-columns: 120px 1fr 64px 120px; height: 64px; border: 1px solid var(--rule); border-top: 0; }
+  .dial { grid-template-columns: 120px 1fr 64px 64px 120px; height: 64px; border: 1px solid var(--rule); border-top: 0; }
   .dial-now .num { font-size: 40px; }
   .dial-name { font-size: 18px; }
   .dial-side .num { font-size: 28px; }
@@ -343,3 +343,15 @@ html[data-tv='on'] .guide:not(.guide-tv) { display: none; }
 .seo-page li a { display: flex; gap: var(--s-3); align-items: baseline; padding: var(--s-3) 0; min-height: 44px; }
 .seo-page li .num { font-size: 24px; color: var(--muted); min-width: 40px; }
 .seo-page .btn { justify-self: start; }
+
+/* ---- compartilhar ---- */
+.share { display: grid; gap: var(--s-4); font-size: 16px; }
+.share p { margin: 0; }
+.share-text { background: var(--raised); padding: var(--s-3) var(--s-4); border-left: 3px solid var(--accent); overflow-wrap: anywhere; }
+.share-link { color: var(--muted); font-size: 15px; overflow-wrap: anywhere; }
+.qr { width: min(320px, 70vw); height: auto; justify-self: center; background: #fff; }
+.qr-wait { aspect-ratio: 1; }
+html[data-tv='on'] .share { font-size: 26px; }
+html[data-tv='on'] .qr { width: min(480px, 60vh); }
+html[data-tv='on'] .share-link { font-size: 22px; }
+.tv-foot-actions { display: flex; gap: var(--s-4); flex-wrap: wrap; }

@@ -7,6 +7,7 @@ interface Handlers {
   toggleHelp: () => void;
   tuneNumber: (n: number) => void;
   toggleTv: () => void;
+  share: () => void;
 }
 
 export const sendPlayerCommand = (cmd: 'fullscreen' | 'mute' | 'pip' | 'playpause' | 'info'): void => {
@@ -20,7 +21,7 @@ function isEditable(t: EventTarget | null): boolean {
 
 /**
  * Atalhos do desktop: ←/→/↑/↓ trocam de canal · Z zapeia · / busca · F tela cheia · M mudo · P PiP ·
- * Espaço pausa · 0–9 + Enter digitam o número do canal · ? mostra os atalhos.
+ * Espaço pausa · S compartilha o canal · 0–9 + Enter digitam o número do canal · ? mostra os atalhos.
  * Devolve o que o usuário está digitando (para mostrar na tela).
  */
 export function useShortcuts(handlers: Handlers): string {
@@ -85,6 +86,9 @@ export function useShortcuts(handlers: Handlers): string {
         case 't':
         case 'T':
           return h.current.toggleTv();
+        case 's':
+        case 'S':
+          return h.current.share();
         case 'f':
         case 'F':
           return sendPlayerCommand('fullscreen');
