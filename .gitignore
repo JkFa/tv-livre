@@ -6,3 +6,9 @@ test-results
 playwright-report
 *.log
 .DS_Store
+poc/legendas/node_modules/
+poc/legendas/clips/
+poc/legendas/resultados/*.wav
+poc/legendas/.perfil-*/
+poc/legendas/*.log
+poc/legendas/resultados/log-*.txt

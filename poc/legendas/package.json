@@ -1,0 +1,9 @@
+{
+  "name": "poc-legendas",
+  "private": true,
+  "type": "module",
+  "description": "Prova de conceito das Legendas IA (medições). Isolada do app: não entra no bundle nem no CI.",
+  "dependencies": {
+    "@huggingface/transformers": "^3.7.0"
+  }
+}
