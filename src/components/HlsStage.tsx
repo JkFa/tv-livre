@@ -2,7 +2,7 @@ import { useEffect, useRef, type RefObject } from 'react';
 import type { HlsConfig, LoaderCallbacks, LoaderConfiguration, LoaderContext } from 'hls.js';
 import type { Channel } from '../../shared/types.ts';
 import { diagnose, type Cause, type HlsErrorLike } from '../lib/diagnose.ts';
-import { buildPlan, caps as readCaps, isHttpUrl, setHttpOk, toHttps, type Step } from '../lib/playback.ts';
+import { buildPlan, caps as readCaps, isHttpUrl, setHttpOk, toHttps, type Engine, type Step } from '../lib/playback.ts';
 
 export type StageState =
   | { phase: 'loading' }
@@ -23,6 +23,10 @@ interface Props {
   videoRef: RefObject<HTMLVideoElement | null>;
   onState: (s: StageState) => void;
   onPausedChange: (paused: boolean) => void;
+  /** AirPlay: só HLS nativo (o AirPlay não funciona com MediaSource). Voltar a `false` restaura o motor anterior. */
+  nativeOnly?: boolean;
+  /** Motor da tentativa em uso (para o player saber se o AirPlay já pode abrir o seletor). */
+  onEngine?: (e: Engine) => void;
 }
 
 const MAX_RECONNECTS = 3;
@@ -36,10 +40,10 @@ type HlsInstance = import('hls.js').default;
  *  - autoplay bloqueado não quebra a interface (o vídeo fica pausado e o usuário aperta play);
  *  - cai/volta a rede, ou o app volta do segundo plano → retoma sozinho.
  */
-export function HlsStage({ channel, force = false, active, attempt, muted, videoRef, onState, onPausedChange }: Props) {
-  const cb = useRef({ onState, onPausedChange, channel });
+export function HlsStage({ channel, force = false, active, attempt, muted, videoRef, onState, onPausedChange, nativeOnly = false, onEngine }: Props) {
+  const cb = useRef({ onState, onPausedChange, channel, onEngine });
   useEffect(() => {
-    cb.current = { onState, onPausedChange, channel };
+    cb.current = { onState, onPausedChange, channel, onEngine };
   });
 
   useEffect(() => {
@@ -207,6 +211,7 @@ export function HlsStage({ channel, force = false, active, attempt, muted, video
       if (!s) return fail('cors', 'sem forma de tocar neste navegador');
       clearTimeout(loadTimer);
       loadTimer = setTimeout(() => fail('timeout'), s.budgetMs);
+      cb.current.onEngine?.(s.engine);
       if (s.engine === 'native') {
         video.src = s.url;
         void tryPlay();
@@ -226,7 +231,7 @@ export function HlsStage({ channel, force = false, active, attempt, muted, video
         mse = false; // sem hls.js ainda dá para tentar o HLS nativo
       }
       if (disposed) return;
-      steps = buildPlan({ url, cors, needsHeaders: force ? false : needsHeaders }, { ...capsNow, mse }, { force });
+      steps = buildPlan({ url, cors, needsHeaders: force ? false : needsHeaders }, { ...capsNow, mse }, { force, nativeOnly });
       if (!steps.length) return fail(mse ? 'cors' : 'media', mse ? 'sem forma de tocar neste canal' : 'Este navegador não suporta HLS');
       init();
     })();
@@ -267,7 +272,7 @@ export function HlsStage({ channel, force = false, active, attempt, muted, video
       video.removeEventListener('error', onVideoError);
       teardown();
     };
-  }, [url, cors, needsHeaders, force, active, attempt, videoRef]);
+  }, [url, cors, needsHeaders, force, active, attempt, videoRef, nativeOnly]);
 
-  return <video ref={videoRef} playsInline muted={muted} preload="none" aria-label="Vídeo do canal" disablePictureInPicture={false} />;
+  return <video ref={videoRef} playsInline muted={muted} preload="none" aria-label="Vídeo do canal" disablePictureInPicture={false} x-webkit-airplay="allow" />;
 }

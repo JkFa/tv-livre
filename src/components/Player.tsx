@@ -1,19 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ChevronLeft, ChevronRight, Download, ExternalLink, Maximize, Minimize, Pause, PictureInPicture2, Play, Power,
-  RotateCw, ShieldCheck, Star, Volume2, VolumeX, WifiOff,
+  Airplay, Cast, ChevronLeft, ChevronRight, Download, ExternalLink, Maximize, Minimize, Pause, PictureInPicture2, Play, Power,
+  RotateCw, ScreenShare, ShieldCheck, Star, Volume2, VolumeX, WifiOff,
 } from 'lucide-react';
 import type { Channel } from '../../shared/types.ts';
 import { youtubeEmbedUrl } from '../../shared/youtube.ts';
+import { castMedia, podeTransmitir } from '../lib/cast.ts';
 import { copyText } from '../lib/clipboard.ts';
+import { diagnoseCast } from '../lib/diagnose.ts';
+import type { CastController } from '../lib/useCast.ts';
+import { programaAgora } from '../lib/programa.ts';
+import { useAirPlay, useRemotePlayback } from '../lib/transporte.ts';
 import { categoryLabel, countryFlag, countryName } from '../lib/labels.ts';
-import { CAUSES, UNSUPPORTED, type UnsupportedWhy } from '../lib/messages.ts';
+import { CAUSAS_CAST, CAUSES, UNSUPPORTED, type UnsupportedWhy } from '../lib/messages.ts';
 import { getMuted, markSwipeHintSeen, setMuted as saveMuted, swipeHintSeen } from '../lib/prefs.ts';
-import { caps, isPlayableHere, unsupportedReason } from '../lib/playback.ts';
+import { caps, isPlayableHere, unsupportedReason, type Engine } from '../lib/playback.ts';
 import { isTvNow } from '../lib/tvmode.ts';
 import { canAllowInsecure, downloadM3u, platform, siteSettingsAddress, vlcHref } from '../lib/vlc.ts';
 import { useMediaSession, useWakeLock } from '../lib/media.ts';
 import { ChannelBadges, StatusMark } from './Badges.tsx';
+import { CastPanel, type CastErro } from './CastPanel.tsx';
 import { ChannelLogo } from './ChannelLogo.tsx';
 import { HlsStage, type StageState } from './HlsStage.tsx';
 import { Sheet } from './Sheet.tsx';
@@ -45,6 +51,10 @@ interface Props {
   onPick: (c: Channel) => void;
   onPlayingChange: (playing: boolean) => void;
   digits: string;
+  /** Transmissão para Chromecast/Google TV (o SDK só é baixado quando o usuário toca em Transmitir). */
+  cast: CastController;
+  /** Avisos curtos (toast). */
+  onAviso: (msg: string) => void;
 }
 
 type Mode = 'hls' | 'embed' | 'youtube-link' | 'unsupported';
@@ -85,6 +95,17 @@ export function Player(props: Props) {
   const [pipOn, setPipOn] = useState(false);
   const [landscapeHint, setLandscapeHint] = useState(false);
   const [swipeHint, setSwipeHint] = useState(() => !swipeHintSeen() && window.matchMedia('(pointer: coarse)').matches);
+  const [castErro, setCastErro] = useState<CastErro | null>(null);
+  const [braveOpen, setBraveOpen] = useState(false);
+  const [castTentativa, setCastTentativa] = useState(0);
+  const [nativeOnly, setNativeOnly] = useState(false);
+  const [engine, setEngine] = useState<Engine | null>(null);
+  const pickerPendente = useRef(false);
+  const numeroRef = useRef(props.number);
+  useEffect(() => {
+    numeroRef.current = props.number;
+  });
+  const cast = props.cast;
 
   // Troca de canal: o mesmo elemento <video> e a mesma tela cheia continuam; só o estado do canal reinicia.
   const channelId = channel ? `${channel.country}/${channel.id}` : '';
@@ -100,8 +121,57 @@ export function Player(props: Props) {
 
   const picked = channel ? pickMode(channel) : null;
   const mode: Mode | null = channel ? (forced ? 'hls' : picked!.mode) : null;
-  const hlsActive = mode === 'hls' && armed && online;
-  const playing = hlsActive ? state.phase === 'playing' || state.phase === 'buffering' : mode === 'embed' && armed;
+  // transmitindo para a TV: o vídeo local para (nada é baixado no celular) e o celular vira controle remoto
+  const castOn = cast.conectado && !!channel;
+  const castable = channel ? podeTransmitir(channel) : false;
+  const hlsActive = mode === 'hls' && armed && online && !castOn;
+  const playing = castOn || (hlsActive ? state.phase === 'playing' || state.phase === 'buffering' : mode === 'embed' && armed);
+
+  // AirPlay (Safari) e Remote Playback: o <video> diz se há destino; AirPlay exige HLS nativo, então trocamos o motor
+  const videoLive = mode === 'hls' && armed && online && !castOn;
+  const airplay = useAirPlay(videoRef, videoLive, channelId);
+  const remote = useRemotePlayback(videoRef, videoLive && engine === 'native' && state.phase === 'playing', channelId);
+  const [airplayJaAtivo, setAirplayJaAtivo] = useState(false);
+  if (airplay.ativo !== airplayJaAtivo) {
+    setAirplayJaAtivo(airplay.ativo);
+    if (!airplay.ativo) setNativeOnly(false); // saiu do AirPlay: volta ao motor anterior (hls.js)
+  }
+  useEffect(() => {
+    if (pickerPendente.current && engine === 'native' && state.phase === 'playing') {
+      pickerPendente.current = false;
+      airplay.seletor(); // o navegador pode exigir novo toque; o segundo toque já abre direto
+    }
+  }, [engine, state.phase, airplay]);
+  const onAirPlay = () => {
+    if (engine === 'native') return airplay.seletor();
+    pickerPendente.current = true; // o seletor abre assim que o HLS nativo estiver tocando
+    setNativeOnly(true);
+  };
+
+  // cada troca de canal durante a transmissão é um novo loadMedia
+  useEffect(() => {
+    if (!castOn || !channel || !castable) return;
+    let vivo = true;
+    void (async () => {
+      setCastErro(null);
+      const r = await cast.transmitir(
+        castMedia(channel, numeroRef.current, {
+          programa: programaAgora(channel)?.title,
+          pais: countryName(channel.country),
+          iconUrl: new URL(`${import.meta.env.BASE_URL}icons/icon-512.png`, window.location.href).href,
+        }),
+      );
+      if (!vivo || r.ok) return;
+      const causa = diagnoseCast(r.codigo, channel);
+      const msg = CAUSAS_CAST[causa] ?? CAUSES[causa];
+      setCastErro({ title: msg.title, text: msg.text, detalhe: r.codigo });
+    })();
+    return () => {
+      vivo = false;
+    };
+    // só reage à troca de canal/sessão; o resto é lido no momento
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [castOn, channelId, castable, castTentativa]);
 
   useEffect(() => onPlayingChange(playing && !paused), [playing, paused, onPlayingChange]);
 
@@ -286,7 +356,9 @@ export function Player(props: Props) {
   }
 
   const why = forced ? undefined : picked!.why;
-  const embedUrl = armed ? youtubeEmbedUrl(channel.youtube) : null;
+  const embedUrl = armed && !castOn ? youtubeEmbedUrl(channel.youtube) : null;
+  const castBotao = mode === 'hls' && castable && cast.botao;
+  const onCast = () => (cast.brave && !cast.sdkPronto ? setBraveOpen(true) : void cast.iniciar());
   const showSpinner = hlsActive && (state.phase === 'loading' || state.phase === 'reconnecting' || state.phase === 'buffering');
   const errorState = hlsActive && state.phase === 'error' ? state : null;
   const phaseAttr = !online && mode === 'hls' ? 'offline' : mode !== 'hls' ? mode : !armed ? 'ready' : state.phase;
@@ -305,7 +377,7 @@ export function Player(props: Props) {
         onFocus={() => poke()}
         onDoubleClick={() => void toggleFullscreen()}
       >
-        {mode === 'hls' && <HlsStage channel={channel} force={forced} active={hlsActive} attempt={attempt} muted={muted} videoRef={videoRef} onState={setState} onPausedChange={setPaused} />}
+        {mode === 'hls' && <HlsStage channel={channel} force={forced} active={hlsActive} attempt={attempt} muted={muted} videoRef={videoRef} onState={setState} onPausedChange={setPaused} nativeOnly={nativeOnly} onEngine={setEngine} />}
 
         {mode === 'embed' && embedUrl && (
           <iframe
@@ -404,6 +476,25 @@ export function Player(props: Props) {
           />
         )}
 
+        {(castOn || airplay.ativo || remote.ativo) && (
+          <CastPanel
+            canal={channel}
+            numero={props.number}
+            aparelho={castOn ? cast.aparelho : null}
+            tipo={castOn ? 'cast' : airplay.ativo ? 'airplay' : 'remote'}
+            {...(castOn ? { volume: { valor: cast.volume, mudo: cast.mudo, onVolume: (v: number) => void cast.definirVolume(v), onMudo: () => void cast.definirMudo(!cast.mudo) } } : {})}
+            naoTransmite={castOn && !castable}
+            erro={castOn ? castErro : null}
+            onParar={castOn ? cast.parar : airplay.ativo ? airplay.seletor : remote.seletor}
+            onProximo={() => onZap(1)}
+            onTentar={() => setCastTentativa((n) => n + 1)}
+          />
+        )}
+
+        {cast.falhou && !castOn && (
+          <div className="status-chip" role="status">Não foi possível carregar o Chromecast. Confira a internet e se o navegador não bloqueia o Google Cast.</div>
+        )}
+
         {/* vinheta de troca: nasce a cada canal novo (key) e some sozinha por CSS */}
         {armed && (mode === 'embed' || (mode === 'hls' && online && !errorState)) && (
           <div className="osd" key={channel.id} aria-hidden="true">
@@ -445,6 +536,21 @@ export function Player(props: Props) {
               </>
             )}
             <span className="ctl-spacer" />
+            {castBotao && (
+              <button type="button" className="ctl" onClick={onCast} aria-pressed={castOn} aria-label={castOn ? 'Transmitindo para a TV' : 'Transmitir para a TV'} title="Transmitir para a TV" data-testid="cast-btn" disabled={cast.carregando}>
+                <Cast size={22} />
+              </button>
+            )}
+            {mode === 'hls' && airplay.disponivel && (
+              <button type="button" className="ctl" onClick={onAirPlay} aria-pressed={airplay.ativo} aria-label="AirPlay" title="AirPlay" data-testid="airplay-btn">
+                <Airplay size={22} />
+              </button>
+            )}
+            {mode === 'hls' && remote.disponivel && !airplay.disponivel && (
+              <button type="button" className="ctl" onClick={() => void remote.seletor()} aria-pressed={remote.ativo} aria-label="Enviar para outra tela" title="Enviar para outra tela" data-testid="remote-btn">
+                <ScreenShare size={22} />
+              </button>
+            )}
             {mode === 'hls' && pipSupported && (
               <button type="button" className="ctl" onClick={() => void togglePip()} aria-pressed={pipOn} aria-label="Imagem sobre imagem">
                 <PictureInPicture2 size={22} />
@@ -469,6 +575,9 @@ export function Player(props: Props) {
             <StatusMark status={channel.status} withText />
             <ChannelBadges channel={channel} />
           </p>
+          {mode === 'embed' && cast.suportado && (
+            <p className="now-note" data-testid="cast-youtube">Para transmitir para a TV, use o botão de transmitir do próprio vídeo do YouTube.</p>
+          )}
           {mode === 'embed' && (
             <p className="now-note">
               O vídeo não aparece?{' '}
@@ -484,6 +593,7 @@ export function Player(props: Props) {
         <ChannelLogo name={channel.name} src={channel.logo} size={56} />
       </div>
       <HttpSheet open={howOpen} onClose={() => setHowOpen(false)} />
+      <BraveCastSheet open={braveOpen} onClose={() => setBraveOpen(false)} onContinuar={() => { setBraveOpen(false); void cast.iniciar(); }} />
     </div>
   );
 }
@@ -506,6 +616,24 @@ function VlcOpen({ channel, variant = 'accent' }: { channel: Channel; variant?: 
     <button type="button" className={cls} onClick={() => downloadM3u(channel)} data-testid="vlc-open">
       <Download size={18} aria-hidden="true" /> Abrir no VLC
     </button>
+  );
+}
+
+/** Brave: o Media Router (Cast) vem desligado. Explica como ligar e só então oferece transmitir. */
+function BraveCastSheet({ open, onClose, onContinuar }: { open: boolean; onClose: () => void; onContinuar: () => void }) {
+  return (
+    <Sheet id="brave-cast" open={open} onClose={onClose} title="Transmitir no Brave" variant="modal"
+      footer={<button type="button" className="btn btn-accent" onClick={onContinuar} data-testid="brave-continuar"><Cast size={18} aria-hidden="true" /> Já liguei, transmitir</button>}>
+      <div className="howto" data-testid="brave-passos">
+        <p>O Brave vem com o Chromecast desligado. Para ligar, uma vez só:</p>
+        <ol>
+          <li>Abra <code>brave://settings/extensions</code>.</li>
+          <li>Ative <b>Media Router</b> (Roteador de mídia).</li>
+          <li>Volte aqui, recarregue a página e toque em <b>Transmitir</b> de novo.</li>
+        </ol>
+        <p className="howto-note">Seu celular e a TV precisam estar na mesma rede Wi-Fi.</p>
+      </div>
+    </Sheet>
   );
 }
 

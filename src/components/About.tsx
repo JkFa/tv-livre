@@ -90,6 +90,12 @@ export function About({ visits }: { visits: number | null }) {
           IP, como qualquer site que você visita. Pedimos só estado e país, sem cidade, sem cookies e sem enviar nada seu. A
           resposta fica só na sessão do navegador e não é guardada pelo TV Livre. Se o serviço falhar, a região não aparece.
         </li>
+        <li>
+          <strong>Transmitir para a TV:</strong> o SDK do Google Cast <b>só é baixado quando você toca em Transmitir</b> (de
+          <code>gstatic.com</code>); ao abrir o site nenhum script de terceiros é carregado. Se você recarregar a página no meio de uma
+          transmissão, ele é baixado de novo só para retomar o controle. Quem busca o vídeo é a TV, direto da fonte do canal; o TV
+          Livre não passa o vídeo por nenhum servidor.
+        </li>
         <li>O app instalado guarda uma cópia da estrutura do site e da lista de canais para abrir offline. Nunca guarda vídeo.</li>
       </ul>
 
