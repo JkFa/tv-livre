@@ -1,4 +1,4 @@
-import { Download, Info, Keyboard, Tv } from 'lucide-react';
+import { Download, Info, Keyboard, Smartphone, Tv } from 'lucide-react';
 import { MODOS, ROTULO_MODO, type ModoAudio } from '../lib/modo.ts';
 import type { ThemePref } from '../lib/prefs.ts';
 import type { TvPref } from '../lib/tvmode.ts';
@@ -12,6 +12,8 @@ interface Props {
   onShortcuts: () => void;
   /** Abre "Assistir na Smart TV" (endereço e número do canal em letras grandes). */
   onSmartTv: () => void;
+  /** Abre "Controlar pelo celular" (QR e código). */
+  onControle: () => void;
   modo: ModoAudio;
   onModo: (m: ModoAudio) => void;
   tvPref: TvPref;
@@ -19,7 +21,7 @@ interface Props {
   dataDate?: string;
 }
 
-export function MoreSheet({ open, onClose, theme, onTheme, onShortcuts, onSmartTv, modo, onModo, tvPref, onTvPref, dataDate }: Props) {
+export function MoreSheet({ open, onClose, theme, onTheme, onShortcuts, onSmartTv, onControle, modo, onModo, tvPref, onTvPref, dataDate }: Props) {
   return (
     <Sheet id="mais" open={open} onClose={onClose} title="Mais">
       <ul className="menu">
@@ -32,6 +34,16 @@ export function MoreSheet({ open, onClose, theme, onTheme, onShortcuts, onSmartT
           <a href="#/sobre" onClick={onClose}>
             <Info size={22} aria-hidden="true" /> Sobre, fontes e remoção de canais
           </a>
+        </li>
+        <li>
+          <a href="#/controle" onClick={onClose} data-testid="more-usar-controle">
+            <Smartphone size={22} aria-hidden="true" /> Usar este celular como controle
+          </a>
+        </li>
+        <li>
+          <button type="button" onClick={() => { onClose(); onControle(); }} data-testid="more-controle">
+            <Smartphone size={22} aria-hidden="true" /> Controlar pelo celular
+          </button>
         </li>
         <li>
           <button type="button" onClick={() => { onClose(); onSmartTv(); }} data-testid="more-smarttv">

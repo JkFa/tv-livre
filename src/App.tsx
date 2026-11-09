@@ -1,6 +1,6 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
-import { ChevronDown, Download, Keyboard, LogOut, Moon, Search, SlidersHorizontal, Sun, Tv, X } from 'lucide-react';
+import { ChevronDown, Download, Keyboard, LogOut, Moon, Search, SlidersHorizontal, Smartphone, Sun, Tv, X } from 'lucide-react';
 import type { Channel, DataIndex } from '../shared/types.ts';
 import { About } from './components/About.tsx';
 import { BottomNav, type Section } from './components/BottomNav.tsx';
@@ -18,7 +18,7 @@ import { ShortcutsDialog } from './components/ShortcutsDialog.tsx';
 import { SmartTvSheet } from './components/SmartTvSheet.tsx';
 import { avisoPulo, podeTransmitir, proximoTransmissivel } from './lib/cast.ts';
 import { readTotal, registerVisit, shouldCount } from './lib/counter.ts';
-import { loadCountries, loadIndex } from './lib/data.ts';
+import { loadCountries, loadCountry, loadIndex } from './lib/data.ts';
 import { agora, comecandoAgora, nowSec, useEpgCountries, useEpgVersion, useGuideClock } from './lib/epg.ts';
 import { compareForDisplay, EMPTY_FILTERS, filterChannels, suggestAlternatives, type Filters } from './lib/filter.ts';
 import { categoryLabel, countryName, languageName, STATUS_LABELS } from './lib/labels.ts';
@@ -31,9 +31,14 @@ import { channelHref, navigate, parseHash, useRoute } from './lib/router.ts';
 import { readString, writeString } from './lib/storage.ts';
 import { fetchRegion, type Region } from './lib/region.ts';
 import { channelShareLink, loadPaginas, peekSlug, shareText } from './lib/share.ts';
-import { useShortcuts } from './lib/shortcuts.ts';
+import { sendPlayerValue, useShortcuts } from './lib/shortcuts.ts';
 import { applyTv, getTvPref, mostrarBotaoSair, resolveTv, setTvPref, type TvPref } from './lib/tvmode.ts';
 import { useCast } from './lib/useCast.ts';
+import type { Acoes } from './lib/remote/acoes.ts';
+import { VERSAO as VERSAO_CONTROLE, type Estado as EstadoRemoto } from './lib/remote/protocolo.ts';
+import { useControleRemoto } from './lib/remote/useControleRemoto.ts';
+import { ControleSheet } from './components/ControleSheet.tsx';
+import { programaAgora } from './lib/programa.ts';
 import { useTvRemote } from './lib/tvremote.ts';
 
 captureInstallPrompt();
@@ -54,7 +59,7 @@ export default function App() {
   const [store, setStore] = useState<Record<string, Channel[]>>({});
   const [armed, setArmed] = useState(false);
   const [playing, setPlaying] = useState(false);
-  const [sheet, setSheet] = useState<null | 'filters' | 'more' | 'help' | 'tv' | 'share'>(null);
+  const [sheet, setSheet] = useState<null | 'filters' | 'more' | 'help' | 'tv' | 'share' | 'controle'>(null);
   const [shareData, setShareData] = useState<ShareData | null>(null);
   const [theme, setThemeState] = useState<ThemePref>(() => getTheme());
   const [toast, setToast] = useState<string | null>(null);
@@ -88,7 +93,7 @@ export default function App() {
   });
 
   /** Cada folha só fecha a si mesma: o evento `close` assíncrono de uma folha que acabou de fechar não pode fechar a próxima. */
-  const closeSheet = useCallback((which: 'filters' | 'more' | 'help' | 'tv' | 'share') => setSheet((s) => (s === which ? null : s)), []);
+  const closeSheet = useCallback((which: 'filters' | 'more' | 'help' | 'tv' | 'share' | 'controle') => setSheet((s) => (s === which ? null : s)), []);
 
   const say = useCallback((msg: string) => {
     setToast(msg);
@@ -325,6 +330,61 @@ export default function App() {
     setModoState(m);
   }, []);
 
+  // ---- controle pelo celular (este aparelho é o "receptor"): os comandos chamam as MESMAS ações do teclado e da TV ----
+  const [midia, setMidia] = useState<{ tocando: boolean; mudo: boolean; volume: number; erro?: string | undefined }>({ tocando: false, mudo: false, volume: 1 });
+  const tuneById = useCallback(
+    (id: string, pais?: string) => {
+      const achar = (l: Channel[] | undefined) => l?.find((c) => c.id === id);
+      const local = (pais ? achar(store[pais]) : undefined) ?? Object.values(store).map(achar).find(Boolean);
+      if (local) return tune(local);
+      if (pais) void loadCountry(pais).then((l) => { const c = achar(l); if (c) tuneRef.current(c); }).catch(() => undefined);
+    },
+    [store, tune],
+  );
+  const acoesRemoto: Acoes = {
+    proximo: () => zap(1),
+    anterior: () => zap(-1),
+    numero: tuneNumber,
+    canalId: tuneById,
+    zapear: shuffle,
+    volume: (v) => sendPlayerValue('volume', v),
+    mudo: (m) => sendPlayerValue('mudo', m),
+    pausa: () => sendPlayerValue('tocar', false),
+    play: () => {
+      setArmed(true);
+      sendPlayerValue('tocar', true);
+    },
+    favoritar: () => selected && toggle(selected),
+    buscar: (texto) => {
+      goWatch();
+      setView('todos');
+      setFilters((f) => ({ ...f, query: texto }));
+    },
+    tela: (cheia) => changeTvPref(cheia ? 'ligado' : 'desligado'), // layout de janela inteira (o navegador não deixa tela cheia por comando remoto)
+  };
+  const programa = selected ? programaAgora(selected)?.title : undefined;
+  const estadoRemoto: EstadoRemoto = {
+    canal: selected
+      ? { id: selected.id, numero: formatNumber(numbers.get(channelKey(selected))), nome: selected.name, pais: selected.country, ...(selected.logo?.startsWith('https://') ? { logo: selected.logo } : {}) }
+      : null,
+    tocando: midia.tocando,
+    mudo: midia.mudo,
+    volume: midia.volume,
+    favorito: selected ? isFavorite(selected) : false,
+    modoTV: tv,
+    versao: VERSAO_CONTROLE,
+    ...(midia.erro ? { erro: midia.erro } : {}),
+    ...(programa ? { programaAtual: programa } : {}),
+  };
+  const controle = useControleRemoto({ acoes: acoesRemoto, estado: estadoRemoto, aoComando: () => say('📱 controle') });
+  const { ativar: ativarControle } = controle;
+  /** O clique (ou a tecla C) que abre a folha é um gesto do usuário: libera o som que o navegador exige para tocar sozinho depois. */
+  const abrirControle = useCallback(() => {
+    setArmed(true);
+    setSheet('controle');
+    void ativarControle();
+  }, [ativarControle]);
+
   const digits = useShortcuts({
     zap,
     shuffle,
@@ -334,6 +394,7 @@ export default function App() {
     toggleTv: () => changeTvPref(tv ? 'desligado' : 'ligado'),
     share: startShare,
     toggleRadio: () => changeModo(modo === 'radio' ? 'normal' : 'radio'),
+    controle: abrirControle,
   });
   useTvRemote({
     enabled: tv && !isDoc && !!index,
@@ -514,6 +575,9 @@ export default function App() {
               <Download size={16} aria-hidden="true" /> Instalar
             </button>
           )}
+          <button type="button" className="icon-btn desktop-only" onClick={abrirControle} aria-label="Controlar pelo celular" title="Controlar pelo celular (C)" data-testid="topbar-controle">
+            <Smartphone size={20} />
+          </button>
           <button type="button" className="icon-btn desktop-only" onClick={() => setSheet('tv')} aria-label="Assistir na Smart TV" title="Assistir na Smart TV" data-testid="topbar-smarttv">
             <Tv size={20} />
           </button>
@@ -620,6 +684,7 @@ export default function App() {
                 onShare={startShare}
                 cast={cast}
                 onAviso={say}
+                onMidia={setMidia}
                 modo={modo}
                 onModo={changeModo}
               />
@@ -727,6 +792,7 @@ export default function App() {
                   <li><kbd className="k-blue">●</kbd> filtros</li>
                 </ul>
                 <span className="tv-foot-actions">
+                  <button type="button" className="link-btn" onClick={abrirControle} data-testid="tv-controle">Controlar pelo celular</button>
                   <button type="button" className="link-btn" onClick={startShare} data-testid="tv-share">Abrir no celular (QR)</button>
                   <button type="button" className="link-btn" onClick={() => changeTvPref('desligado')}>Sair do modo TV</button>
                 </span>
@@ -767,8 +833,9 @@ export default function App() {
         />
       )}
       <SmartTvSheet open={sheet === 'tv'} onClose={() => closeSheet('tv')} numero={selected ? formatNumber(numbers.get(channelKey(selected))) : null} />
-      <MoreSheet open={sheet === 'more'} onClose={() => closeSheet('more')} onSmartTv={() => setSheet('tv')} modo={modo} onModo={changeModo} theme={theme} onTheme={changeTheme} onShortcuts={() => setSheet('help')} tvPref={tvPref} onTvPref={changeTvPref} dataDate={dataDate} />
+      <MoreSheet open={sheet === 'more'} onClose={() => closeSheet('more')} onSmartTv={() => setSheet('tv')} onControle={abrirControle} modo={modo} onModo={changeModo} theme={theme} onTheme={changeTheme} onShortcuts={() => setSheet('help')} tvPref={tvPref} onTvPref={changeTvPref} dataDate={dataDate} />
       <ShortcutsDialog open={sheet === 'help'} onClose={() => closeSheet('help')} />
+      <ControleSheet open={sheet === 'controle'} onClose={() => closeSheet('controle')} controle={controle} tv={tv} />
       <ShareSheet open={sheet === 'share'} onClose={() => closeSheet('share')} data={shareData} tv={tv} />
 
       {needRefresh && !updateDismissed && (

@@ -6,6 +6,8 @@ export type Route =
   | { name: 'watch' }
   | { name: 'about' }
   | { name: 'install' }
+  /** O celular como controle remoto de outro TV Livre (`#/controle?s=…&k=…`). Os parâmetros ficam só no navegador. */
+  | { name: 'remote' }
   /** Atalhos do app instalado (manifest): executam uma ação e abrem o aparelho (#/canais). */
   | { name: 'action'; action: 'zap' | 'favorites' | 'search' }
   | { name: 'channel'; country: string; id: string };
@@ -16,6 +18,7 @@ export function parseHash(hash: string): Route {
   if (parts[0] === 'canais') return { name: 'watch' };
   if (parts[0] === 'sobre') return { name: 'about' };
   if (parts[0] === 'instalar') return { name: 'install' };
+  if (parts[0] === 'controle') return { name: 'remote' };
   if (parts[0] === 'zapear') return { name: 'action', action: 'zap' };
   if (parts[0] === 'favoritos') return { name: 'action', action: 'favorites' };
   if (parts[0] === 'buscar') return { name: 'action', action: 'search' };

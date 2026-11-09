@@ -20,7 +20,7 @@ interface Props {
 }
 
 /** QR code como SVG (módulos escuros viram um único <path>). Carrega a biblioteca só quando precisa. */
-function Qr({ value }: { value: string }) {
+export function Qr({ value }: { value: string }) {
   const [svg, setSvg] = useState<{ size: number; d: string } | null>(null);
   useEffect(() => {
     let alive = true;

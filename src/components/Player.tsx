@@ -65,6 +65,8 @@ interface Props {
   cast: CastController;
   /** Avisos curtos (toast). */
   onAviso: (msg: string) => void;
+  /** Estado da mídia para o controle remoto pelo celular. */
+  onMidia?: (m: { tocando: boolean; mudo: boolean; volume: number; erro?: string | undefined }) => void;
   /** Normal, Econômico ou Rádio (preferência `tvlivre:modo-audio`). */
   modo: ModoAudio;
   onModo: (m: ModoAudio) => void;
@@ -103,6 +105,8 @@ export function Player(props: Props) {
   const [paused, setPaused] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [muted, setMutedState] = useState(() => getMuted());
+  const [volume, setVolume] = useState(1);
+  const volumeRef = useRef(1);
   const [forced, setForced] = useState(false);
   const [copied, setCopied] = useState(false);
   const [howOpen, setHowOpen] = useState(false);
@@ -210,6 +214,15 @@ export function Player(props: Props) {
 
   useEffect(() => onPlayingChange(playing && !paused), [playing, paused, onPlayingChange]);
 
+  // volume do usuário (celular ou teclado); o timer de desligar baixa o volume em cima dele e o restaura
+  useEffect(() => {
+    volumeRef.current = volume;
+    for (const el of [videoRef.current, audioRef.current]) if (el) el.volume = volume;
+  }, [volume, mode, radio]);
+  const erroMidia = hlsActive && state.phase === 'error' ? CAUSES[state.cause].title : undefined;
+  const { onMidia } = props;
+  useEffect(() => onMidia?.({ tocando: playing && !paused, mudo: muted, volume, erro: erroMidia }), [onMidia, playing, paused, muted, volume, erroMidia]);
+
   useMediaSession(
     channel && armed ? { title: channel.name, artist: guide.now?.title ?? 'TV Livre', logo: channel.logo } : null,
     {
@@ -225,7 +238,7 @@ export function Player(props: Props) {
   // timer de desligar: pausa no fim e baixa o volume nos últimos 10 s
   const timer = useSleepTimer({
     volume: (v) => {
-      for (const el of [videoRef.current, audioRef.current]) if (el) el.volume = v;
+      for (const el of [videoRef.current, audioRef.current]) if (el) el.volume = v * volumeRef.current;
     },
     fim: () => {
       videoRef.current?.pause();
@@ -338,6 +351,29 @@ export function Player(props: Props) {
     document.addEventListener('tvlivre:cmd', onCmd);
     return () => document.removeEventListener('tvlivre:cmd', onCmd);
   }, [toggleFullscreen, toggleMute, togglePip, togglePlay]);
+
+  // comandos com valor (controle remoto pelo celular): volume, mudo explícito e tocar/pausar
+  useEffect(() => {
+    const onCmdV = (e: Event) => {
+      const { cmd, valor } = (e as CustomEvent<{ cmd: string; valor: number | boolean }>).detail;
+      if (cmd === 'volume' && typeof valor === 'number') {
+        setVolume(valor);
+        if (valor > 0) {
+          setMutedState(false);
+          saveMuted(false);
+        }
+      } else if (cmd === 'mudo' && typeof valor === 'boolean') {
+        setMutedState(valor);
+        saveMuted(valor);
+      } else if (cmd === 'tocar') {
+        const el = radio ? audioRef.current : videoRef.current;
+        if (valor === true) void el?.play().catch(() => undefined);
+        else el?.pause();
+      }
+    };
+    document.addEventListener('tvlivre:cmdv', onCmdV);
+    return () => document.removeEventListener('tvlivre:cmdv', onCmdV);
+  }, [radio]);
 
   const copyLink = useCallback(async () => {
     if (!channel) return;

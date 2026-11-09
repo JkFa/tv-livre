@@ -404,3 +404,19 @@ html[data-tv='on'] .share-link { font-size: 22px; }
 .radio-play { min-width: 64px !important; min-height: 64px !important; }
 .radio-screen .btn { min-height: 44px; }
 @media (prefers-reduced-motion: reduce) { .radio-screen[data-tocando='on'] .radio-luz::after { animation: none; opacity: 0.5; transform: scale(1.2); } }
+
+/* ---- controlar pelo celular (folha no computador/TV) ---- */
+.controle-sheet { display: grid; gap: var(--s-3); font-size: 16px; justify-items: center; text-align: center; }
+.controle-sheet p { margin: 0; }
+.controle-sheet .qr { width: min(300px, 62vw); }
+.controle-passo { font-weight: 700; }
+.controle-codigo { display: grid; gap: 4px; justify-items: center; }
+.controle-cod { font-size: clamp(44px, 12vw, 72px); line-height: 1; letter-spacing: 0.06em; color: var(--accent-text); }
+.controle-erro { color: var(--accent-text); }
+.controle-lista { width: 100%; text-align: left; display: grid; gap: var(--s-2); }
+.controle-lista h3 { font: 800 16px/1.2 var(--font-display); margin: 0; }
+.controle-lista ul { list-style: none; margin: 0; padding: 0; display: grid; }
+.controle-lista li { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); padding: var(--s-2) 0; border-bottom: 1px solid var(--rule); font-size: 15px; }
+html[data-tv='on'] .controle-sheet { font-size: 24px; }
+html[data-tv='on'] .controle-sheet .qr { width: min(420px, 50vh); }
+html[data-tv='on'] .controle-cod { font-size: 88px; }

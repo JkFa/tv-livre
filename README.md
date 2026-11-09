@@ -28,13 +28,48 @@ Detalhes, tokens e regras de movimento em [DESIGN.md](DESIGN.md).
 | Recurso | Como funciona |
 |---|---|
 | Zapear | Dial `‹ 06 · 07 Nome · 08 ›`, deslizar no player (ignora as bordas da tela, que são do sistema), botão central **Zapear**. |
-| Teclado (desktop) | `←` `→` `↑` `↓` trocam de canal · `Z` zapeia · `/` busca · `F` tela cheia · `M` mudo · `P` PiP · `Espaço` pausa · `S` compartilha · `R` alterna o Rádio · `0–9`+`Enter` digitam o número · `?` lista os atalhos. |
+| Teclado (desktop) | `←` `→` `↑` `↓` trocam de canal · `Z` zapeia · `/` busca · `F` tela cheia · `M` mudo · `P` PiP · `Espaço` pausa · `S` compartilha · `R` alterna o Rádio · `C` abre "Controlar pelo celular" · `0–9`+`Enter` digitam o número · `?` lista os atalhos. |
 | Mobile | Navegação inferior ao alcance do polegar, filtros em folha inferior, player fixo no topo, `playsinline`, paisagem com player e grade lado a lado e convite para tela cheia. |
 | Plataforma | Picture-in-Picture, Media Session (tela de bloqueio e teclas de mídia trocam de canal) e Wake Lock (tela ligada enquanto toca). |
 | Resiliência | Autoplay só após uma ação do usuário; se o navegador bloquear, a interface continua. Queda de rede ou volta do segundo plano retomam o canal (até 3 tentativas), pulando para o ao vivo. |
+| Controle pelo celular | O celular vira controle remoto (QR ou código, dial, teclado numérico, volume, aba Canais): ver a seção abaixo. |
 | Transmitir e modos | **Transmitir** (Chromecast, AirPlay), **Normal · Econômico · Rádio**, timer de desligar e consumo estimado: ver as seções abaixo. |
 | Retomada | Lembra o último canal (`tvlivre:ultimo`) e oferece "Voltar ao canal NN" ao abrir. |
 | Erros | Explica a causa provável (fora do ar, bloqueio por região, CORS, formato, sem internet), oferece tentar de novo, **Abrir no VLC** com um toque (sem copiar link) e sugere outros canais. |
+
+## Controle pelo celular
+
+O celular vira controle remoto do TV Livre que está tocando no **computador ou na Smart TV**, só com o navegador: sem instalar app e sem servidor próprio. **O vídeo continua tocando só no computador/TV**; o celular envia comandos e recebe o estado (canal, número, programa, volume, erro).
+
+**Como usar.**
+1. No computador/TV: **Mais › Controlar pelo celular** (ícone de celular no topo, no computador; item no rodapé da grade no Modo TV) ou tecla **C**. Esse clique é o gesto do usuário que libera o som que o navegador exige: **deixe a aba aberta**; o celular controla daqui.
+2. No celular: escaneie o **QR code** com a câmera (abre `#/controle`) ou, sem câmera, abra o site no celular, toque em **Mais › Usar este celular como controle** (`#/controle`) e digite o **código de 8 caracteres** (alfabeto sem 0, O, 1, I; vale **10 minutos** se ninguém conectar).
+3. O celular mostra o canal atual (número em destaque, nome, logo, programa se houver guia), **dial ‹ ›** (ou deslizar o topo), **teclado numérico** com Enter, **Zapear**, pausa/play, mudo, favoritar, **tela inteira** (liga o layout de janela inteira do Modo TV no computador) e **volume**. A aba **Canais** tem a grade com logos, busca pelo teclado do celular, favoritos e recentes; tocar num canal abre no computador. Se o canal cair, o celular mostra "Fora do ar no computador" com **Próximo canal**.
+4. No computador, a folha lista os celulares ("📱 Celular conectado · iPhone · agora") com **Desconectar** (até **3** ao mesmo tempo), **Encerrar o controle** (gera QR e código novos e desconecta todos) e **Desligar**. Cada comando mostra a vinheta de troca de canal e o aviso "📱 controle". Reaproveita as mesmas ações do teclado e da TV (`zap`, `tuneNumber`, favoritar…).
+
+**Segurança.**
+| Item | Como é |
+|---|---|
+| Pareamento (QR) | `sessao` = 16 bytes aleatórios e `chave` = AES-GCM 256 (WebCrypto). Link: `…/tv-livre/#/controle?s=<sessao>&k=<chave>`: tudo depois do `#`, **nunca vai a servidor**; o celular apaga a chave do endereço ao abrir. |
+| Tópicos | `tvlivre/v1/<hash(sessao)>/cmd` (celular → computador) e `…/estado` (computador → celular, **mensagem retida**). O broker só vê o hash. |
+| Mensagens | **Toda mensagem é cifrada** (AES-GCM, IV aleatório por mensagem) e leva `seq`, `ts`, a versão e o remetente. O computador descarta mensagem com **mais de 30 s**, com `seq` **repetido** ou **adulterada** (o AES-GCM autentica). |
+| Código alternativo | Sessão e chave **derivadas do código** (PBKDF2-SHA-256, 200 mil iterações, sal fixo do app). **Expira em 10 min** e é de **uso único**: ao conectar, o computador envia uma chave nova pelo canal já cifrado e o código deixa de valer. |
+| Entrada | Todo comando e estado é validado (`src/lib/remote/protocolo.ts`): tipo, faixa e tamanho; o que não passa é descartado. |
+| Acesso | Até 3 celulares; o computador desconecta qualquer um (que fica bloqueado) e **Encerrar** invalida o QR antigo. A sessão ativa vive em `sessionStorage` (sobrevive a recarregar a aba, não a fechá-la). |
+
+**O que trafega e por onde.** Só mensagens cifradas, pelo broker MQTT público **HiveMQ** (`wss://broker.hivemq.com:8884/mqtt`, gratuito, sem conta), configurável em `src/lib/remote/transporteMqtt.ts`. Quem vê a rede ou o broker vê tópicos com hash e bytes ilegíveis, não os canais nem os comandos. Quem **fotografa o QR** ou lê o código tem o controle até você **Encerrar**.
+
+**Privacidade.** **Nada é carregado nem conectado até você ativar o controle**: o receptor, o pacote `mqtt` (≈ 99 KB gzip, chunk próprio, fora do pré-cache do service worker) e a conexão com o broker só entram ao ativar. A tela do celular (`#/controle`) é outro chunk, carregado só nessa rota; o celular nunca carrega vídeo nem a lista de streams, só o índice de canais para a grade.
+
+**Desenvolvimento e testes.** `tvlivre:remote-broker` no `localStorage` troca o transporte: `broadcast` (duas abas do mesmo aparelho, via `BroadcastChannel`) ou `ws://host:porta` (broker local). Os E2E sobem um broker local (`aedes` + `ws`, `e2e/broker.ts`): nada sai para a internet.
+
+**Limitações.**
+- **Tela cheia:** o navegador não deixa entrar em tela cheia por comando remoto (e o TV Livre não tenta contornar). O botão do celular liga um **layout de janela inteira**; para tela cheia de verdade, aperte **F11** uma vez no computador.
+- **iPhone:** o Safari derruba o WebSocket em segundo plano. Ao voltar, o controle reconecta sozinho mostrando "reconectando…" e reenvia `ping`. Com a tela bloqueada o controle não recebe nem envia nada.
+- **Redes que bloqueiam WebSocket** (empresas, escolas, alguns Wi-Fi públicos): o celular mostra o motivo e "Tentar de novo". O broker é de terceiros e gratuito: pode ficar fora do ar ou limitar a taxa.
+- **Relógio:** a janela de 30 s exige data e hora parecidas nos dois aparelhos; se não forem, o celular avisa para ajustar.
+- **O computador precisa ficar com a aba aberta** (em segundo plano funciona; aba fechada ou computador dormindo, não).
+- Os favoritos e recentes da aba Canais são os **do celular**; o botão ★ do controle favorita no **computador**.
 
 ## Transmitir para a TV
 
@@ -263,6 +298,7 @@ shared/           tipos e utilitários usados pelo pipeline e pelo site
 src/brand/        geometria única da marca (moldura aberta + luz de transmissão)
 src/styles/       tokens (claro/escuro), base e componentes
 src/components/   Player, HlsStage, grade (ChannelList), folhas, navegação inferior, páginas Sobre e Instalar
+src/lib/remote/   controle pelo celular: cifra (AES-GCM, código, anti-repetição), protocolo validado, receptor (computador), controlador (celular) e transportes (MQTT, BroadcastChannel)
 src/lib/          filtros, grade/zapear, atalhos, preferências, contador, PWA, rotas por hash, armazenamento seguro, Cast (cast.ts, castSdk.ts, useCast.ts), AirPlay (transporte.ts), modos e timer (modo.ts, timer.ts)
 tests/unit/       testes unitários (Vitest) com playlists reais e malformadas em tests/fixtures/
 e2e/              testes de ponta a ponta (Playwright) e da PWA
@@ -274,7 +310,7 @@ Rotas usam *hash* (`#/` tela inicial, `#/canais` player + grade, `#/canal/BR/<id
 build ainda copia `index.html` para `404.html`. Os atalhos do manifesto usam `#/zapear`, `#/favoritos` e `#/buscar`.
 
 `localStorage` (todas as leituras e escritas com `try/catch`): `tvlivre:favoritos`, `tvlivre:recentes`, `tvlivre:pais`,
-`tvlivre:ultimo`, `tvlivre:tema`, `tvlivre:mudo`, `tvlivre:instalar-dispensado`, `tvlivre:dica-deslizar`, `tvlivre:http-liberado`, `tvlivre:modo-tv`, `tvlivre:modo-audio` (`normal` | `economico` | `radio`), `tvlivre:timer-padrao` (`15` | `30` | `60` | `90` | `fim`), `tvlivre:dica-dados` e `tvlivre:transmitindo` (só existe durante uma transmissão que o usuário começou).
+`tvlivre:ultimo`, `tvlivre:tema`, `tvlivre:mudo`, `tvlivre:instalar-dispensado`, `tvlivre:dica-deslizar`, `tvlivre:http-liberado`, `tvlivre:modo-tv`, `tvlivre:modo-audio` (`normal` | `economico` | `radio`), `tvlivre:timer-padrao` (`15` | `30` | `60` | `90` | `fim`), `tvlivre:dica-dados` e `tvlivre:transmitindo`; em `sessionStorage` (só enquanto a aba existe): `tvlivre:controle-sessao` (computador) e `tvlivre:controle-par` (celular); `tvlivre:remote-broker` só para desenvolvimento (só existe durante uma transmissão que o usuário começou).
 
 ## Créditos e licenças
 
