@@ -17,7 +17,8 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "check": "npm run lint && npm run typecheck && npm test"
+    "check": "npm run lint && npm run typecheck && npm test",
+    "build:pages": "tsx scripts/build-pages.ts"
   },
   "dependencies": {
     "@tanstack/react-virtual": "^3.14.26",

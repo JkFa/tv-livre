@@ -1,0 +1,6 @@
+{
+  "$comment": "Política de páginas indexáveis (Google). indexar: 'free-tv-e-publicos' = só canais no ar cuja fonte principal é o Free-TV ou de categoria public/education/legislative/religious; 'nenhum' = só os de 'permitir'. permitir/bloquear: ids de canal (ou 'PAÍS/id'). Canais de config/removals.json nunca ganham página.",
+  "indexar": "free-tv-e-publicos",
+  "permitir": [],
+  "bloquear": []
+}

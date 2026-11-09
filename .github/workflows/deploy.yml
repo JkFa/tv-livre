@@ -61,10 +61,16 @@ jobs:
       - name: Build
         run: npm run build
 
+      # Páginas estáticas indexáveis (um HTML por canal elegível, categorias, países, prévias OG e sitemap).
+      # As prévias são renderizadas com o Chromium do Playwright.
+      - name: Navegadores do Playwright
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Páginas indexáveis e sitemap
+        run: npm run build:pages
+
       - name: 'Testes de ponta a ponta (Playwright em Chromium e WebKit; Android, iPhone e desktop emulados)'
-        run: |
-          npx playwright install --with-deps chromium webkit
-          npm run test:e2e
+        run: npm run test:e2e
 
       - uses: actions/configure-pages@v6
 

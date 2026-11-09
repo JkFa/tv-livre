@@ -324,8 +324,14 @@ export default function App() {
   };
 
   useEffect(() => {
+    // páginas estáticas de categoria/país: o título indexado fica como está
+    if (route.name === 'home' && !window.location.hash && document.querySelector('meta[name="tvlivre:estatica"]')) return;
+    // na página estática do canal (/canal/br/slug/) o título é o mesmo que o Google indexou
+    const staticRef = document.querySelector<HTMLMetaElement>('meta[name="tvlivre:canal"]')?.content;
     document.title = selected
-      ? `${formatNumber(numbers.get(channelKey(selected)))} ${selected.name} — TV Livre`
+      ? staticRef === `${selected.country}/${selected.id}`
+        ? `${selected.name} ao vivo — canal ${formatNumber(numbers.get(channelKey(selected)))} | TV Livre`
+        : `${formatNumber(numbers.get(channelKey(selected)))} ${selected.name} — TV Livre`
       : route.name === 'about'
         ? 'Sobre — TV Livre'
         : route.name === 'install'

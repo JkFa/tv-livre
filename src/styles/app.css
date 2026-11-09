@@ -328,3 +328,18 @@ html[data-tv='on'] .guide-tv .prog-lg { height: 8px; }
 html[data-tv='on'] .row-now { font-size: 20px; }
 html[data-tv='on'] .prog { width: 96px; height: 6px; }
 html[data-tv='on'] .guide:not(.guide-tv) { display: none; }
+
+/* ---- páginas estáticas de canal/categoria/país (visíveis antes do app carregar e sem JavaScript) ---- */
+.seo-page { max-width: 640px; margin: 0 auto; padding: var(--s-8) var(--s-5); background: var(--bg); color: var(--text); min-height: 100dvh; }
+.seo-page article { display: grid; gap: var(--s-4); }
+.seo-page h1 { font: 850 clamp(28px, 6vw, 44px)/1.05 var(--font-display); font-stretch: 112%; letter-spacing: -0.01em; margin: 0; }
+.seo-page h2 { font: 800 20px/1.2 var(--font-display); margin: var(--s-4) 0 0; }
+.seo-page p { margin: 0; }
+.seo-kicker, .seo-nav { color: var(--muted); font-size: 14px; }
+.seo-kicker a, .seo-nav a { color: var(--accent-text); }
+.seo-num { font-size: clamp(96px, 28vw, 160px); line-height: 0.8; color: var(--accent-text); }
+.seo-page ul { list-style: none; margin: 0; padding: 0; display: grid; }
+.seo-page li { border-bottom: 1px solid var(--rule); }
+.seo-page li a { display: flex; gap: var(--s-3); align-items: baseline; padding: var(--s-3) 0; min-height: 44px; }
+.seo-page li .num { font-size: 24px; color: var(--muted); min-width: 40px; }
+.seo-page .btn { justify-self: start; }
