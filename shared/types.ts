@@ -77,3 +77,13 @@ export function isBrowserPlayable(ch: Channel): boolean {
   if (ch.kind === 'youtube') return ch.youtube?.embeddable === true;
   return ch.kind === 'hls' && ch.cors !== false && !ch.needsHeaders;
 }
+
+/** Um programa do guia: [início, fim, título, categoria?]. Horários em epoch UTC, em segundos. */
+export type EpgEntry = [number, number, string, string?];
+
+/** Arquivo data/epg/<PAÍS>.json: programação por id de canal (o mesmo `Channel.id` da grade). */
+export interface EpgFile {
+  /** ISO 8601 do momento em que o guia foi gerado. */
+  generatedAt: string;
+  channels: Record<string, EpgEntry[]>;
+}

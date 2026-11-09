@@ -9,6 +9,8 @@
     "dev": "vite",
     "data": "tsx scripts/build-data.ts",
     "data:quick": "tsx scripts/build-data.ts --no-probe",
+    "epg": "tsx scripts/build-epg.ts run",
+    "epg:coverage": "tsx scripts/epg-coverage.ts",
     "build": "tsc -b && vite build",
     "preview": "vite preview --port 4173 --strictPort",
     "typecheck": "tsc -b --noEmit",
