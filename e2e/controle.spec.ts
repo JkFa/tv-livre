@@ -286,9 +286,19 @@ test.describe('com computador e celular', () => {
     await cel.getByTestId('controle-proximo').click();
     await expect(tv).toHaveURL(/#\/canal\/BR\//, { timeout: 15_000 });
     // iPhone: ao voltar do segundo plano, reconecta mostrando "reconectando…" e reenvia o ping
-    await cel.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-    await expect(cel.getByTestId('controle-status')).toHaveText('Reconectando…');
+    // o "Reconectando…" dura milissegundos num broker local rápido: em vez de torcer para o Playwright pegá-lo, um
+    // observador grava as mudanças de situação e o teste confere a sequência reconectando → conectado
+    await cel.evaluate(() => {
+      const w = window as unknown as { __sit: string[] };
+      w.__sit = [];
+      const el = document.querySelector('[data-testid=controle-status]')!;
+      new MutationObserver(() => w.__sit.push(el.getAttribute('data-situacao')!)).observe(el, { attributes: true, attributeFilter: ['data-situacao'] });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await expect.poll(() => cel.evaluate(() => (window as unknown as { __sit: string[] }).__sit)).toContain('reconectando');
     await expect(cel.getByTestId('controle-status')).toHaveText('Conectado', { timeout: 20_000 });
+    const sit = await cel.evaluate(() => (window as unknown as { __sit: string[] }).__sit);
+    expect(sit.indexOf('reconectando')).toBeLessThan(sit.lastIndexOf('conectado'));
   });
 
   test('o computador em segundo plano continua recebendo comandos', async ({ browser }) => {
