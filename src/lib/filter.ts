@@ -1,4 +1,5 @@
 import type { Channel, Status } from '../../shared/types.ts';
+import { bomParaOuvir } from './modo.ts';
 import { caps, isPlayableHere } from './playback.ts';
 
 export interface Filters {
@@ -9,9 +10,11 @@ export interface Filters {
   playableOnly: boolean;
   /** Só canais com programa que começou há pouco ou começa logo (precisa do guia). */
   startingNow: boolean;
+  /** "Bom para ouvir": notícias, música, religião, conversa, esportes e educação. */
+  listen: boolean;
 }
 
-export const EMPTY_FILTERS: Filters = { query: '', category: '', language: '', status: '', playableOnly: false, startingNow: false };
+export const EMPTY_FILTERS: Filters = { query: '', category: '', language: '', status: '', playableOnly: false, startingNow: false, listen: false };
 
 export function normalizeSearch(text: string): string {
   return text
@@ -54,6 +57,7 @@ export function filterChannels(list: readonly Channel[], f: Filters, ctx: { star
     if (f.language && !ch.languages.includes(f.language)) continue;
     if (f.playableOnly && !isPlayableHere(ch, caps())) continue;
     if (f.startingNow && !ctx.startingNow?.(ch)) continue;
+    if (f.listen && !bomParaOuvir(ch.categories)) continue;
     let score = 0;
     if (tokens.length) {
       const key = searchKey(ch);

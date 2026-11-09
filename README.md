@@ -28,12 +28,47 @@ Detalhes, tokens e regras de movimento em [DESIGN.md](DESIGN.md).
 | Recurso | Como funciona |
 |---|---|
 | Zapear | Dial `‹ 06 · 07 Nome · 08 ›`, deslizar no player (ignora as bordas da tela, que são do sistema), botão central **Zapear**. |
-| Teclado (desktop) | `←` `→` `↑` `↓` trocam de canal · `Z` zapeia · `/` busca · `F` tela cheia · `M` mudo · `P` PiP · `Espaço` pausa · `S` compartilha · `0–9`+`Enter` digitam o número · `?` lista os atalhos. |
+| Teclado (desktop) | `←` `→` `↑` `↓` trocam de canal · `Z` zapeia · `/` busca · `F` tela cheia · `M` mudo · `P` PiP · `Espaço` pausa · `S` compartilha · `R` alterna o Rádio · `0–9`+`Enter` digitam o número · `?` lista os atalhos. |
 | Mobile | Navegação inferior ao alcance do polegar, filtros em folha inferior, player fixo no topo, `playsinline`, paisagem com player e grade lado a lado e convite para tela cheia. |
 | Plataforma | Picture-in-Picture, Media Session (tela de bloqueio e teclas de mídia trocam de canal) e Wake Lock (tela ligada enquanto toca). |
 | Resiliência | Autoplay só após uma ação do usuário; se o navegador bloquear, a interface continua. Queda de rede ou volta do segundo plano retomam o canal (até 3 tentativas), pulando para o ao vivo. |
+| Transmitir e modos | **Transmitir** (Chromecast, AirPlay), **Normal · Econômico · Rádio**, timer de desligar e consumo estimado: ver as seções abaixo. |
 | Retomada | Lembra o último canal (`tvlivre:ultimo`) e oferece "Voltar ao canal NN" ao abrir. |
 | Erros | Explica a causa provável (fora do ar, bloqueio por região, CORS, formato, sem internet), oferece tentar de novo, **Abrir no VLC** com um toque (sem copiar link) e sugere outros canais. |
+
+## Transmitir para a TV
+
+Botão **Transmitir** nos controles do player (só em Chrome, Edge, Brave e outros Chromium; **fora do Modo TV**). Só canais **HLS em HTTPS, com CORS liberado e sem cabeçalhos especiais** podem ser transmitidos (`podeTransmitir`, `src/lib/cast.ts`): o receptor do Chromecast é um app web e pede o vídeo com as mesmas regras do hls.js. Canais HTTP e sem CORS **não** são transmissíveis (não há proxy nem contorno). Canal do YouTube usa o botão de transmitir do próprio embed oficial (o player mostra uma dica).
+
+| Plataforma | Como funciona |
+|---|---|
+| **Chromecast / Google TV** (Chromium) | Primeiro toque: baixa o SDK do Google Cast **só nesse momento** e abre o seletor. Usa o *Default Media Receiver*; envia a URL do canal (`application/x-mpegURL`, `LIVE`) com título "07 · Nome", subtítulo = programa atual (se o guia existir) ou país e o logo (se https). Depois do SDK, o botão some se não houver aparelho. |
+| **AirPlay** (Safari: iPhone, iPad, Mac) | `webkitShowPlaybackTargetPicker`; o botão só aparece com destino na rede. O AirPlay não funciona com MediaSource, então a tentativa troca para **HLS nativo** (`buildPlan(..., { nativeOnly: true })`) e volta ao hls.js ao sair do AirPlay. |
+| **Remote Playback API** | Onde `video.remote` existe e o canal toca por `src` nativo; se o navegador recusar, a opção some. |
+| **Smart TV sem Chromecast** | **Mais › Assistir na Smart TV** (e o ícone de TV no topo, no computador): endereço curto e número do canal em letras grandes, para digitar no navegador da TV (o **Modo TV** liga sozinho lá). |
+
+**Durante a transmissão o celular vira controle remoto.** O vídeo local para (nada é baixado no celular) e aparece o painel "Transmitindo para {aparelho}" com o número e o nome grandes, volume, mudo e **Parar transmissão** (volta a tocar no celular no mesmo canal). **Zapear continua funcionando** (‹ ›, deslizar, Zapear, teclas, Media Session): cada troca faz um novo `loadMedia` e os canais não transmissíveis são **pulados** com o aviso "canal X não pode ser transmitido, pulando". Erro do receptor aparece no padrão do diagnóstico, com a oferta do próximo canal. Se a página recarregar com a transmissão ativa, o painel é retomado.
+
+**Privacidade.** Nenhum script de terceiros é carregado na abertura do site. O SDK do Google Cast (`gstatic.com`) só é baixado quando você toca em Transmitir (ou, ao recarregar a página no meio de uma transmissão que você mesmo começou, para retomar o controle; isso usa `tvlivre:transmitindo`). Há teste E2E garantindo que nenhuma requisição a `gstatic.com` acontece antes do toque.
+
+**Brave.** O Cast vem desligado (Media Router). Em vez de mostrar um botão quebrado, o Transmitir abre o passo a passo (`brave://settings/extensions` › Media Router), repetido na página **Instalar**, e só depois oferece transmitir.
+
+## Modo rádio e economia de dados
+
+Seletor **Normal · Econômico · Rádio** abaixo do dial (e em **Mais**); tecla **R** alterna o Rádio. A escolha fica em `tvlivre:modo-audio`.
+
+| Modo | O que faz |
+|---|---|
+| **Normal** | Qualidade automática, como sempre. |
+| **Econômico** | Vídeo no **menor bitrate** da lista (`autoLevelCapping` + `currentLevel`), sem trocar de canal nem recarregar. |
+| **Rádio** | Só áudio, num elemento **`<audio>`** (o som tem mais chance de continuar com a tela apagada e o app em segundo plano; no HLS nativo do iPhone, `<audio src>`). Usa uma **variante só de áudio** se a lista tiver; senão o menor nível de vídeo, com o vídeo oculto. O **Wake Lock é liberado** (a tela pode apagar); a Media Session segue com título, canal e arte e os botões anterior/próximo trocam de canal. Tela do Rádio: número gigante, nome, programa (se houver guia) e a luz de transmissão da marca (parada com `prefers-reduced-motion`). |
+
+- **Timer de desligar** (15, 30, 60, 90 min ou "fim do programa", este só se houver guia): pausa a reprodução e **baixa o volume gradualmente nos últimos 10 s**. Lembra a última escolha em `tvlivre:timer-padrao`.
+- **"Bom para ouvir"** nos filtros: categorias `news`, `music`, `religious`, `talk`, `sports` e `education`.
+- **Sugestão automática:** com `navigator.connection.saveData` ou `effectiveType` `2g`/`3g`, aparece **uma vez** um convite discreto para Econômico ou Rádio (dispensável; não volta por 30 dias, `tvlivre:dica-dados`).
+- **Consumo honesto.** Mostra o **MB/h estimado** do nível em uso (`bitrate × 3600 / 8`) e o **consumido nesta sessão**, somando os bytes reais dos trechos baixados (`FRAG_LOADED` → `stats.loaded`). Se a lista não tem variante só de áudio, diz isso e informa o consumo do menor vídeo. Canal com **uma única qualidade** avisa que o modo não reduz o consumo. No **HLS nativo (iPhone)** não dá para escolher a qualidade nem medir: aparece "economia não garantida neste aparelho", sem números inventados.
+- **O que esperar (amostra real).** Em 114 canais no ar sorteados, **só 1 tem variante só de áudio** (0,9%): na prática o Rádio quase sempre cai no menor vídeo (média ≈ 725 MB/h contra ≈ 728 do Econômico e ≈ 1.048 do Normal médio, pelo BANDWIDTH declarado). O ganho do Rádio é **tela apagada e bateria**, não dados. Detalhes em `scripts/amostra-modos.ts`.
+- O hls.js **remove as variantes só de áudio** de `hls.levels` quando há variantes de vídeo; por isso a variante é lida do manifesto bruto (`MANIFEST_LOADED`) e a fonte é recarregada nela.
 
 ## Instalar como aplicativo (PWA)
 
@@ -228,7 +263,7 @@ shared/           tipos e utilitários usados pelo pipeline e pelo site
 src/brand/        geometria única da marca (moldura aberta + luz de transmissão)
 src/styles/       tokens (claro/escuro), base e componentes
 src/components/   Player, HlsStage, grade (ChannelList), folhas, navegação inferior, páginas Sobre e Instalar
-src/lib/          filtros, grade/zapear, atalhos, preferências, contador, PWA, rotas por hash, armazenamento seguro
+src/lib/          filtros, grade/zapear, atalhos, preferências, contador, PWA, rotas por hash, armazenamento seguro, Cast (cast.ts, castSdk.ts, useCast.ts), AirPlay (transporte.ts), modos e timer (modo.ts, timer.ts)
 tests/unit/       testes unitários (Vitest) com playlists reais e malformadas em tests/fixtures/
 e2e/              testes de ponta a ponta (Playwright) e da PWA
 public/           ícones, telas de abertura, capturas, og.png (gerados e versionados)
@@ -239,7 +274,7 @@ Rotas usam *hash* (`#/` tela inicial, `#/canais` player + grade, `#/canal/BR/<id
 build ainda copia `index.html` para `404.html`. Os atalhos do manifesto usam `#/zapear`, `#/favoritos` e `#/buscar`.
 
 `localStorage` (todas as leituras e escritas com `try/catch`): `tvlivre:favoritos`, `tvlivre:recentes`, `tvlivre:pais`,
-`tvlivre:ultimo`, `tvlivre:tema`, `tvlivre:mudo`, `tvlivre:instalar-dispensado`, `tvlivre:dica-deslizar`, `tvlivre:http-liberado`, `tvlivre:modo-tv`.
+`tvlivre:ultimo`, `tvlivre:tema`, `tvlivre:mudo`, `tvlivre:instalar-dispensado`, `tvlivre:dica-deslizar`, `tvlivre:http-liberado`, `tvlivre:modo-tv`, `tvlivre:modo-audio` (`normal` | `economico` | `radio`), `tvlivre:timer-padrao` (`15` | `30` | `60` | `90` | `fim`), `tvlivre:dica-dados` e `tvlivre:transmitindo` (só existe durante uma transmissão que o usuário começou).
 
 ## Créditos e licenças
 
@@ -262,4 +297,6 @@ aponta para transmissões publicadas por eles.
 - **iOS:** instalação só pelo Safari; no iPhone a tela cheia usa o player nativo; as telas de abertura cobrem iPhone e iPad em retrato.
 - Links gratuitos mudam ou saem do ar sem aviso; a qualidade das fontes varia.
 - Canais do iptv-org sem canal associado nos metadados são ignorados (não dá para filtrar adultos nem definir o país).
+- **Transmitir:** só HLS em HTTPS com CORS e sem cabeçalhos (≈ 63% dos canais no ar); o Chromecast não funciona no Safari/Firefox (use AirPlay no Safari) e vem desligado no Brave. Nada disso foi testado em aparelho real nesta versão (ver a lista de testes manuais no PR).
+- **Rádio e Econômico:** só reduzem dados onde a lista tem mais de um nível (≈ 40% dos canais da amostra); variante só de áudio é rara. No iPhone (HLS nativo) a economia não é garantida nem medida. O Rádio com a tela bloqueada depende do navegador e do sistema (iOS e Android podem suspender o áudio de abas em segundo plano).
 - Logos são carregados dos servidores de origem **só do canal aberto** e podem falhar (aparecem as iniciais).

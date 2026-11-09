@@ -1,4 +1,5 @@
 import { Download, Share, SquarePlus } from 'lucide-react';
+import { eBrave } from '../lib/cast.ts';
 import { useInstall } from '../lib/pwa.ts';
 
 export function InstallPage() {
@@ -56,6 +57,25 @@ export function InstallPage() {
           <b> Instalar</b>. Se o seu navegador não oferecer instalação, o site continua funcionando normalmente na aba: dá
           até para fixá-la.
         </p>
+      </section>
+
+      <section>
+        <h2>Transmitir para a TV (Chromecast, AirPlay)</h2>
+        <p>
+          No <b>Chrome</b> e no <b>Edge</b> (Android e computador), o botão <b>Transmitir</b> do player envia o canal para o
+          Chromecast ou Google TV; o celular vira controle remoto (zapear, volume, parar). No <b>Safari</b> (iPhone, iPad e Mac),
+          use o botão <b>AirPlay</b>. Seu aparelho e a TV precisam estar na mesma rede Wi-Fi. Só canais HLS em HTTPS e com CORS
+          liberado podem ser transmitidos. Sem Chromecast, abra <b>Mais › Assistir na Smart TV</b>.
+        </p>
+        {eBrave() && (
+          <div className="notice" data-testid="brave-ajuda">
+            <h3>Você está no Brave</h3>
+            <p>
+              No Brave o Chromecast vem desligado. Abra <code>brave://settings/extensions</code>, ative <b>Media Router</b> e
+              recarregue o TV Livre. Depois disso o botão <b>Transmitir</b> funciona.
+            </p>
+          </div>
+        )}
       </section>
 
       <section>

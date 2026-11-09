@@ -1,4 +1,5 @@
-import { Download, Info, Keyboard } from 'lucide-react';
+import { Download, Info, Keyboard, Tv } from 'lucide-react';
+import { MODOS, ROTULO_MODO, type ModoAudio } from '../lib/modo.ts';
 import type { ThemePref } from '../lib/prefs.ts';
 import type { TvPref } from '../lib/tvmode.ts';
 import { Sheet } from './Sheet.tsx';
@@ -9,12 +10,16 @@ interface Props {
   theme: ThemePref;
   onTheme: (t: ThemePref) => void;
   onShortcuts: () => void;
+  /** Abre "Assistir na Smart TV" (endereço e número do canal em letras grandes). */
+  onSmartTv: () => void;
+  modo: ModoAudio;
+  onModo: (m: ModoAudio) => void;
   tvPref: TvPref;
   onTvPref: (p: TvPref) => void;
   dataDate?: string;
 }
 
-export function MoreSheet({ open, onClose, theme, onTheme, onShortcuts, tvPref, onTvPref, dataDate }: Props) {
+export function MoreSheet({ open, onClose, theme, onTheme, onShortcuts, onSmartTv, modo, onModo, tvPref, onTvPref, dataDate }: Props) {
   return (
     <Sheet id="mais" open={open} onClose={onClose} title="Mais">
       <ul className="menu">
@@ -27,6 +32,11 @@ export function MoreSheet({ open, onClose, theme, onTheme, onShortcuts, tvPref, 
           <a href="#/sobre" onClick={onClose}>
             <Info size={22} aria-hidden="true" /> Sobre, fontes e remoção de canais
           </a>
+        </li>
+        <li>
+          <button type="button" onClick={() => { onClose(); onSmartTv(); }} data-testid="more-smarttv">
+            <Tv size={22} aria-hidden="true" /> Assistir na Smart TV
+          </button>
         </li>
         <li className="menu-desktop">
           <button type="button" onClick={() => { onClose(); onShortcuts(); }}>
@@ -43,6 +53,17 @@ export function MoreSheet({ open, onClose, theme, onTheme, onShortcuts, tvPref, 
             </button>
           ))}
         </div>
+      </fieldset>
+      <fieldset className="field">
+        <legend>Modo de áudio e dados</legend>
+        <div className="seg">
+          {MODOS.map((m) => (
+            <button key={m} type="button" aria-pressed={modo === m} onClick={() => onModo(m)} data-testid={`mais-modo-${m}`}>
+              {ROTULO_MODO[m]}
+            </button>
+          ))}
+        </div>
+        <p className="muted small"><b>Econômico</b>: vídeo na menor qualidade. <b>Rádio</b>: só o som, a tela pode apagar (atalho R).</p>
       </fieldset>
       <fieldset className="field">
         <legend>Modo TV</legend>

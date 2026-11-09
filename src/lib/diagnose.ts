@@ -23,3 +23,13 @@ export function diagnose(data: HlsErrorLike, ch: Pick<Channel, 'status' | 'geo'>
   }
   return 'unknown';
 }
+
+/** Erro do receptor do Chromecast (código do `chrome.cast.ErrorCode`/`loadMedia`) → causa, no mesmo padrão do player local. */
+export function diagnoseCast(codigo: string, canal: Pick<Channel, 'status' | 'geo'>): Cause {
+  if (/TIMEOUT/i.test(codigo)) return 'timeout';
+  if (/CANCEL|SESSION|RECEIVER_UNAVAILABLE|API_NOT_INITIALIZED/i.test(codigo)) return 'device';
+  if (canal.status === 'offline') return 'offline';
+  if (canal.geo) return 'geo';
+  // LOAD_MEDIA_FAILED / LOAD_FAILED: o receptor não conseguiu buscar o vídeo (fonte fora do ar ou CORS diferente do registrado)
+  return /LOAD|MEDIA|NETWORK/i.test(codigo) ? 'cors' : 'unknown';
+}

@@ -355,3 +355,52 @@ html[data-tv='on'] .share { font-size: 26px; }
 html[data-tv='on'] .qr { width: min(480px, 60vh); }
 html[data-tv='on'] .share-link { font-size: 22px; }
 .tv-foot-actions { display: flex; gap: var(--s-4); flex-wrap: wrap; }
+/* ---- transmitir para a TV ---- */
+.cast-panel { position: absolute; inset: 0; z-index: 6; background: #15110e; color: #f1e9d8; display: grid; align-content: center; justify-items: center; gap: var(--s-2); padding: var(--s-2) var(--s-3); text-align: center; overflow-y: auto; }
+.cast-kicker { display: inline-flex; gap: var(--s-2); align-items: center; font-size: 15px; color: #bdb29d; margin: 0; }
+.cast-ch { display: grid; justify-items: center; gap: 2px; min-width: 0; max-width: 100%; }
+.cast-num { font-size: clamp(56px, 16vw, 140px); line-height: 0.82; color: var(--accent); }
+.cast-name { font: 850 clamp(20px, 4vw, 30px)/1.1 var(--font-display); font-stretch: 112%; overflow-wrap: anywhere; }
+.cast-ctl { display: flex; align-items: center; gap: var(--s-2); width: min(560px, 100%); }
+.cast-ctl .btn { white-space: nowrap; }
+.cast-ctl .btn:last-child { flex: 0 1 auto; min-width: 0; padding-inline: var(--s-3); font-size: 14px; }
+.cast-ctl .btn-icon { flex: none; }
+.cast-vol { flex: 1 1 40px; min-width: 40px; min-height: 44px; accent-color: var(--accent); }
+.cast-erro { display: grid; justify-items: center; gap: 4px; background: #2a241d; border-left: 3px solid var(--accent); padding: var(--s-3) var(--s-4); max-width: 46ch; text-align: left; }
+.cast-erro p { margin: 0; font-size: 14px; color: #bdb29d; }
+.cast-panel .btn { min-height: 44px; }
+.cast-panel .tech { font-size: 12px; }
+.smarttv { display: grid; gap: var(--s-4); font-size: 17px; }
+.smarttv ol { margin: 0; padding-left: 22px; display: grid; gap: var(--s-4); }
+.smarttv-url { display: block; font: 800 clamp(22px, 6vw, 34px)/1.15 var(--font-display); font-stretch: 112%; color: var(--accent-text); margin-top: 4px; overflow-wrap: anywhere; }
+.smarttv-num { display: block; font-size: clamp(96px, 28vw, 150px); line-height: 0.85; color: var(--accent-text); margin-top: 4px; }
+
+/* ---- modos Normal / Econômico / Rádio ---- */
+.modebar { display: grid; gap: 6px; padding: var(--s-2) var(--s-4); border-bottom: 1px solid var(--rule); background: var(--surface); }
+.modebar-row { display: flex; gap: var(--s-3); align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.modebar .seg button { min-height: 44px; }
+.modebar .btn-sm { min-height: 44px; }
+.modebar-info { margin: 0; font-size: 13px; line-height: 1.35; }
+.modebar-aviso { color: var(--text); }
+.datatip { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-3); padding: var(--s-2) var(--s-4); border-bottom: 1px solid var(--rule); background: var(--raised); font-size: 14px; }
+.datatip .link-btn, .datatip .icon-btn { min-height: 44px; min-width: 44px; }
+.datatip .icon-btn { margin-left: auto; }
+.seg-wrap { flex-wrap: wrap; }
+.timer { display: grid; gap: var(--s-4); font-size: 16px; }
+.timer p { margin: 0; }
+.timer .seg button { min-height: 48px; min-width: 88px; }
+
+.stage[data-radio] video { display: none; }
+.radio-screen { position: absolute; inset: 0; z-index: 4; background: #15110e; color: #f1e9d8; display: grid; align-content: center; justify-items: center; gap: var(--s-2); padding: var(--s-4); text-align: center; overflow-y: auto; }
+.radio-kicker { display: inline-flex; gap: var(--s-2); align-items: center; font-size: 14px; color: #bdb29d; margin: 0; }
+.radio-luz { width: 12px; height: 12px; border-radius: 50%; background: var(--accent); position: relative; display: inline-block; }
+.radio-screen[data-tocando='on'] .radio-luz::after { content: ''; position: absolute; inset: -6px; border-radius: 50%; border: 2px solid var(--accent); animation: radio-luz 1.8s var(--ease-in) infinite; }
+@keyframes radio-luz { 0% { transform: scale(0.6); opacity: 0.9; } 100% { transform: scale(1.5); opacity: 0; } }
+.radio-num { font-size: clamp(88px, 26vw, 170px); line-height: 0.82; color: var(--accent); }
+.radio-nome { font: 850 clamp(20px, 4vw, 30px)/1.1 var(--font-display); font-stretch: 112%; margin: 0; overflow-wrap: anywhere; }
+.radio-prog { margin: 0; font-size: 15px; color: #bdb29d; max-width: 40ch; }
+.radio-ctl { display: flex; gap: var(--s-4); align-items: center; margin-top: var(--s-2); }
+.radio-ctl .btn-icon { min-width: 48px; min-height: 48px; }
+.radio-play { min-width: 64px !important; min-height: 64px !important; }
+.radio-screen .btn { min-height: 44px; }
+@media (prefers-reduced-motion: reduce) { .radio-screen[data-tocando='on'] .radio-luz::after { animation: none; opacity: 0.5; transform: scale(1.2); } }

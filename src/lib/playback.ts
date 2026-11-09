@@ -68,6 +68,8 @@ const BUDGET = { direct: 22_000, upgrade: 7_000, insecure: 14_000 } as const;
 export interface PlanOptions {
   /** "Tentar mesmo assim": ignora o aviso de CORS. */
   force?: boolean;
+  /** AirPlay não funciona com MediaSource (hls.js): só tentativas de HLS nativo (`video.src`). */
+  nativeOnly?: boolean;
 }
 
 export function buildPlan(ch: Pick<Channel, 'url' | 'cors' | 'needsHeaders'>, caps: Caps, opts: PlanOptions = {}): Step[] {
@@ -75,7 +77,7 @@ export function buildPlan(ch: Pick<Channel, 'url' | 'cors' | 'needsHeaders'>, ca
   const corsOk = ch.cors !== false || !!opts.force;
   const steps: Step[] = [];
   const add = (engine: Engine, url: string, kind: keyof typeof BUDGET, upgrade = false) => {
-    if (engine === 'hlsjs' && !(caps.mse && corsOk)) return;
+    if (engine === 'hlsjs' && (opts.nativeOnly || !(caps.mse && corsOk))) return;
     if (engine === 'native' && !caps.nativeHls) return;
     steps.push({ engine, url, upgrade, insecure: kind === 'insecure', budgetMs: BUDGET[kind] });
   };

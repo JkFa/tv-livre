@@ -17,7 +17,7 @@ interface Props {
 }
 
 export function activeFilterCount(f: Filters): number {
-  return [f.category, f.language, f.status].filter(Boolean).length + (f.playableOnly ? 1 : 0) + (f.startingNow ? 1 : 0);
+  return [f.category, f.language, f.status].filter(Boolean).length + (f.playableOnly ? 1 : 0) + (f.startingNow ? 1 : 0) + (f.listen ? 1 : 0);
 }
 
 export function FilterSheet({ open, onClose, index, country, onCountry, filters, onFilters, resultCount }: Props) {
@@ -28,7 +28,7 @@ export function FilterSheet({ open, onClose, index, country, onCountry, filters,
     return countryName(a.code).localeCompare(countryName(b.code), 'pt-BR');
   });
   const langs = [...index.languages].map((l) => ({ ...l, name: languageName(l.id) })).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
-  const clear = () => onFilters({ ...filters, category: '', language: '', status: '', playableOnly: false, startingNow: false });
+  const clear = () => onFilters({ ...filters, category: '', language: '', status: '', playableOnly: false, startingNow: false, listen: false });
 
   return (
     <Sheet
@@ -103,6 +103,11 @@ export function FilterSheet({ open, onClose, index, country, onCountry, filters,
           <span>Começando agora (programas que acabaram de começar ou começam em 15 min)</span>
         </label>
       )}
+
+      <label className="check">
+        <input type="checkbox" checked={filters.listen} onChange={(e) => set({ listen: e.target.checked })} data-testid="filter-ouvir" />
+        <span>Bom para ouvir (notícias, música, religião, esportes, educação)</span>
+      </label>
 
       <label className="check">
         <input type="checkbox" checked={filters.playableOnly} onChange={(e) => set({ playableOnly: e.target.checked })} />

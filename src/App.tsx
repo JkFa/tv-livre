@@ -1,6 +1,6 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
-import { ChevronDown, Download, Keyboard, Moon, Search, SlidersHorizontal, Sun, X } from 'lucide-react';
+import { ChevronDown, Download, Keyboard, Moon, Search, SlidersHorizontal, Sun, Tv, X } from 'lucide-react';
 import type { Channel, DataIndex } from '../shared/types.ts';
 import { About } from './components/About.tsx';
 import { BottomNav, type Section } from './components/BottomNav.tsx';
@@ -15,6 +15,8 @@ import { OfflineBar, Toast, UpdateBar } from './components/Notices.tsx';
 import { Player, type Neighbor } from './components/Player.tsx';
 import { ShareSheet, type ShareData } from './components/ShareSheet.tsx';
 import { ShortcutsDialog } from './components/ShortcutsDialog.tsx';
+import { SmartTvSheet } from './components/SmartTvSheet.tsx';
+import { avisoPulo, podeTransmitir, proximoTransmissivel } from './lib/cast.ts';
 import { readTotal, registerVisit, shouldCount } from './lib/counter.ts';
 import { loadCountries, loadIndex } from './lib/data.ts';
 import { agora, comecandoAgora, nowSec, useEpgCountries, useEpgVersion, useGuideClock } from './lib/epg.ts';
@@ -22,6 +24,7 @@ import { compareForDisplay, EMPTY_FILTERS, filterChannels, suggestAlternatives, 
 import { categoryLabel, countryName, languageName, STATUS_LABELS } from './lib/labels.ts';
 import { useFavorites, useRecents, type ChannelRef } from './lib/library.ts';
 import { buildNumbers, channelKey, findByNumber, formatNumber, pickShuffle, stepChannel } from './lib/lineup.ts';
+import { getModoAudio, setModoAudio, type ModoAudio } from './lib/modo.ts';
 import { applyTheme, getLastChannel, getTheme, setLastChannel, setTheme, type ThemePref } from './lib/prefs.ts';
 import { captureInstallPrompt, useInstall, useOnline } from './lib/pwa.ts';
 import { channelHref, navigate, parseHash, useRoute } from './lib/router.ts';
@@ -30,6 +33,7 @@ import { fetchRegion, type Region } from './lib/region.ts';
 import { channelShareLink, loadPaginas, peekSlug, shareText } from './lib/share.ts';
 import { useShortcuts } from './lib/shortcuts.ts';
 import { applyTv, getTvPref, resolveTv, setTvPref, type TvPref } from './lib/tvmode.ts';
+import { useCast } from './lib/useCast.ts';
 import { useTvRemote } from './lib/tvremote.ts';
 
 captureInstallPrompt();
@@ -50,7 +54,7 @@ export default function App() {
   const [store, setStore] = useState<Record<string, Channel[]>>({});
   const [armed, setArmed] = useState(false);
   const [playing, setPlaying] = useState(false);
-  const [sheet, setSheet] = useState<null | 'filters' | 'more' | 'help' | 'share'>(null);
+  const [sheet, setSheet] = useState<null | 'filters' | 'more' | 'help' | 'tv' | 'share'>(null);
   const [shareData, setShareData] = useState<ShareData | null>(null);
   const [theme, setThemeState] = useState<ThemePref>(() => getTheme());
   const [toast, setToast] = useState<string | null>(null);
@@ -59,8 +63,10 @@ export default function App() {
   const [updateDismissed, setUpdateDismissed] = useState(false);
   const [tvPref, setTvPrefState] = useState<TvPref>(() => getTvPref());
   const [guideOpen, setGuideOpen] = useState(false);
+  const [modo, setModoState] = useState<ModoAudio>(() => getModoAudio());
   const [focusReq, setFocusReq] = useState(0);
   const tv = resolveTv(tvPref);
+  const cast = useCast(tv);
   const searchRef = useRef<HTMLInputElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const pendingZap = useRef(false);
@@ -80,6 +86,9 @@ export default function App() {
       if (reg) setInterval(() => void reg.update().catch(() => undefined), 60 * 60 * 1000);
     },
   });
+
+  /** Cada folha só fecha a si mesma: o evento `close` assíncrono de uma folha que acabou de fechar não pode fechar a próxima. */
+  const closeSheet = useCallback((which: 'filters' | 'more' | 'help' | 'tv' | 'share') => setSheet((s) => (s === which ? null : s)), []);
 
   const say = useCallback((msg: string) => {
     setToast(msg);
@@ -211,11 +220,19 @@ export default function App() {
   const zapList = visible.length ? visible : baseList;
   const zap = useCallback(
     (dir: 1 | -1) => {
+      // transmitindo para a TV: só canais que o Chromecast consegue abrir; os outros são pulados com aviso
+      if (cast.conectado) {
+        const { canal, puladas } = proximoTransmissivel(zapList, selectedKey, dir);
+        if (puladas.length) say(avisoPulo(puladas, numbers));
+        if (canal) tune(canal);
+        else say('Nenhum outro canal desta lista pode ser transmitido.');
+        return;
+      }
       const next = stepChannel(zapList, selectedKey, dir);
       if (next) tune(next);
       else say('Nenhum outro canal disponível nessa lista.');
     },
-    [zapList, selectedKey, tune, say],
+    [zapList, selectedKey, tune, say, cast.conectado, numbers],
   );
   const shuffle = useCallback(() => {
     if (!index) return;
@@ -224,10 +241,11 @@ export default function App() {
       pendingZap.current = true; // dados ainda carregando: sorteia assim que chegarem
       return;
     }
-    const pick = pickShuffle(pool, selectedKey) ?? pickShuffle(baseList, selectedKey);
+    const castPool = (l: Channel[]) => (cast.conectado ? l.filter(podeTransmitir) : l);
+    const pick = pickShuffle(castPool(pool), selectedKey) ?? pickShuffle(castPool(baseList), selectedKey);
     if (pick) tune(pick);
     else say('Nenhum canal no ar com esses filtros. Tente limpar os filtros.');
-  }, [index, visible, baseList, missingKey, selectedKey, tune, say]);
+  }, [index, visible, baseList, missingKey, selectedKey, tune, say, cast.conectado]);
 
   const tuneNumber = useCallback(
     (n: number) => {
@@ -298,6 +316,10 @@ export default function App() {
     }
     setSheet('share');
   }, [selected, numbers, tv, say]);
+  const changeModo = useCallback((m: ModoAudio) => {
+    setModoAudio(m);
+    setModoState(m);
+  }, []);
 
   const digits = useShortcuts({
     zap,
@@ -307,6 +329,7 @@ export default function App() {
     tuneNumber,
     toggleTv: () => changeTvPref(tv ? 'desligado' : 'ligado'),
     share: startShare,
+    toggleRadio: () => changeModo(modo === 'radio' ? 'normal' : 'radio'),
   });
   useTvRemote({
     enabled: tv && !isDoc && !!index,
@@ -373,7 +396,7 @@ export default function App() {
   };
 
   const neighbor = (dir: 1 | -1): Neighbor | null => {
-    const c = stepChannel(zapList, selectedKey, dir);
+    const c = cast.conectado ? proximoTransmissivel(zapList, selectedKey, dir).canal : stepChannel(zapList, selectedKey, dir);
     return c ? { number: formatNumber(numbers.get(channelKey(c))), name: c.name } : null;
   };
   const suggestions = useMemo(() => (selected ? suggestAlternatives(selected, store[selected.country] ?? []) : []), [selected, store]);
@@ -422,6 +445,7 @@ export default function App() {
   if (filters.language) chips.push({ label: languageName(filters.language), clear: () => setFilters({ ...filters, language: '' }) });
   if (filters.status) chips.push({ label: STATUS_LABELS[filters.status], clear: () => setFilters({ ...filters, status: '' }) });
   if (filters.startingNow) chips.push({ label: 'Começando agora', clear: () => setFilters({ ...filters, startingNow: false }) });
+  if (filters.listen) chips.push({ label: 'Bom para ouvir', clear: () => setFilters({ ...filters, listen: false }) });
   if (filters.playableOnly) chips.push({ label: 'Só no navegador', clear: () => setFilters({ ...filters, playableOnly: false }) });
 
   const empty = (
@@ -485,6 +509,9 @@ export default function App() {
               <Download size={16} aria-hidden="true" /> Instalar
             </button>
           )}
+          <button type="button" className="icon-btn desktop-only" onClick={() => setSheet('tv')} aria-label="Assistir na Smart TV" title="Assistir na Smart TV" data-testid="topbar-smarttv">
+            <Tv size={20} />
+          </button>
           <button type="button" className="icon-btn desktop-only" onClick={() => setSheet('help')} aria-label="Atalhos do teclado" title="Atalhos (?)">
             <Keyboard size={20} />
           </button>
@@ -586,6 +613,10 @@ export default function App() {
                 onPlayingChange={setPlaying}
                 digits={digits}
                 onShare={startShare}
+                cast={cast}
+                onAviso={say}
+                modo={modo}
+                onModo={changeModo}
               />
             )}
             {iosBar}
@@ -715,7 +746,7 @@ export default function App() {
       {index && (
         <FilterSheet
           open={sheet === 'filters'}
-          onClose={() => setSheet(null)}
+          onClose={() => closeSheet('filters')}
           index={index}
           country={effectiveCountry}
           onCountry={changeCountry}
@@ -724,9 +755,10 @@ export default function App() {
           resultCount={visible.length}
         />
       )}
-      <MoreSheet open={sheet === 'more'} onClose={() => setSheet(null)} theme={theme} onTheme={changeTheme} onShortcuts={() => setSheet('help')} tvPref={tvPref} onTvPref={changeTvPref} dataDate={dataDate} />
-      <ShortcutsDialog open={sheet === 'help'} onClose={() => setSheet(null)} />
-      <ShareSheet open={sheet === 'share'} onClose={() => setSheet(null)} data={shareData} tv={tv} />
+      <SmartTvSheet open={sheet === 'tv'} onClose={() => closeSheet('tv')} numero={selected ? formatNumber(numbers.get(channelKey(selected))) : null} />
+      <MoreSheet open={sheet === 'more'} onClose={() => closeSheet('more')} onSmartTv={() => setSheet('tv')} modo={modo} onModo={changeModo} theme={theme} onTheme={changeTheme} onShortcuts={() => setSheet('help')} tvPref={tvPref} onTvPref={changeTvPref} dataDate={dataDate} />
+      <ShortcutsDialog open={sheet === 'help'} onClose={() => closeSheet('help')} />
+      <ShareSheet open={sheet === 'share'} onClose={() => closeSheet('share')} data={shareData} tv={tv} />
 
       {needRefresh && !updateDismissed && (
         <UpdateBar playing={playing} onUpdate={() => void updateServiceWorker(true)} onDismiss={() => setUpdateDismissed(true)} />
