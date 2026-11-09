@@ -108,7 +108,7 @@ testar de verdade a partir da origem `https://jkfa.github.io`: o CounterAPI v2 e
 
 ## Modo TV (controle remoto)
 
-Em navegadores de TV (Samsung/Tizen, LG/webOS, Google TV, Fire TV, Chromecast) o site liga sozinho o **Modo TV**: vídeo em tela cheia, letras e foco grandes para 3 metros, e tudo controlado pelo controle remoto. Em qualquer outro aparelho: **Mais → Modo TV → Ligado**, tecla **T** no teclado, ou abra `?tv=1` no endereço (`?tv=0` desliga, `?tv=auto` volta ao automático). Também há **Sair do modo TV** no rodapé da grade.
+Em navegadores de TV (Samsung/Tizen, LG/webOS, Google TV, Fire TV, Chromecast) o site liga sozinho o **Modo TV**: vídeo em tela cheia, letras e foco grandes para 3 metros, e tudo controlado pelo controle remoto. Em qualquer outro aparelho: **Mais → Modo TV → Ligado**, tecla **T** no teclado, ou abra `?tv=1` no endereço (`?tv=0` desliga, `?tv=auto` volta ao automático). **Para sair no navegador:** quando o modo foi ligado à mão (`?tv=1`, menu ou celular), um botão **Sair do modo TV** fica **sempre visível** no canto superior esquerdo, em qualquer tela (vendo o canal, com a grade aberta, tela inicial, páginas de texto); além dele, a tecla **T** e a tecla **Esc** saem (com a grade aberta, o primeiro Esc só a fecha). Em **TV de verdade** (Modo TV ligado sozinho) o botão fica escondido, o mouse segue oculto e o Voltar do controle continua sendo da TV. Também há **Sair do modo TV** no rodapé da grade.
 
 | Tecla | Assistindo | Na grade |
 |---|---|---|
