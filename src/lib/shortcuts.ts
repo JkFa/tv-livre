@@ -10,10 +10,17 @@ interface Handlers {
   share: () => void;
   /** Alterna o modo Rádio (só áudio). */
   toggleRadio: () => void;
+  /** Abre "Controlar pelo celular". */
+  controle: () => void;
 }
 
 export const sendPlayerCommand = (cmd: 'fullscreen' | 'mute' | 'pip' | 'playpause' | 'info'): void => {
   document.dispatchEvent(new CustomEvent('tvlivre:cmd', { detail: cmd }));
+};
+
+/** Comandos com valor (volume, mudo explícito, tocar/pausar), usados pelo controle remoto pelo celular. */
+export const sendPlayerValue = (cmd: 'volume' | 'mudo' | 'tocar', valor: number | boolean): void => {
+  document.dispatchEvent(new CustomEvent('tvlivre:cmdv', { detail: { cmd, valor } }));
 };
 
 function isEditable(t: EventTarget | null): boolean {
@@ -94,6 +101,9 @@ export function useShortcuts(handlers: Handlers): string {
         case 'r':
         case 'R':
           return h.current.toggleRadio();
+        case 'c':
+        case 'C':
+          return h.current.controle();
         case 'f':
         case 'F':
           return sendPlayerCommand('fullscreen');

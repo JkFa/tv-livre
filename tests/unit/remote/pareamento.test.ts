@@ -109,7 +109,7 @@ describe('pareamento por QR', () => {
 
 describe('rejeição de mensagens', () => {
   it('velha (> 30 s), repetida, adulterada, de outra chave, lixo e comando inválido: nada executa', async () => {
-    let agora = 1_800_000_000_000;
+    const agora = 1_800_000_000_000;
     const { bus, par, acoes, celular } = await montar({ relogio: () => agora });
     const c = await celular();
     await c.enviar({ c: 'canal:proximo' });
@@ -353,7 +353,7 @@ describe('estado, versão, queda e reconexão', () => {
   });
 
   it('relógios muito diferentes: avisa para ajustar a data e a hora', async () => {
-    let agoraTv = 1_800_000_000_000;
+    const agoraTv = 1_800_000_000_000;
     const { r, par, bus } = await montar({ relogio: () => agoraTv });
     const { sessao, chaveRaw } = parse(par.link);
     const c = new Controlador({ transporte: bus.criar(), sessao, chaveRaw, nome: 'Cel', relogio: () => agoraTv + 5 * 60_000 });

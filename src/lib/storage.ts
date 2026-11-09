@@ -32,3 +32,26 @@ export function writeString(key: string, value: string): void {
     /* armazenamento indisponível: o app continua funcionando sem persistência */
   }
 }
+
+// ---- sessionStorage (sobrevive a recarregar a página, não a fechar a aba) ----
+export function readSession(key: string): string | null {
+  try {
+    return window.sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+export function writeSession(key: string, value: string): void {
+  try {
+    window.sessionStorage.setItem(key, value);
+  } catch {
+    /* sem armazenamento de sessão: o controle funciona, só não sobrevive a recarregar */
+  }
+}
+export function removeSession(key: string): void {
+  try {
+    window.sessionStorage.removeItem(key);
+  } catch {
+    /* nada */
+  }
+}

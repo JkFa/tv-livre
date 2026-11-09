@@ -55,7 +55,8 @@ export default defineConfig({
       workbox: {
         // estrutura do app: pré-cache. Dados e vídeo ficam fora do pré-cache.
         globPatterns: ['**/*.{js,css,html,woff2,svg,webmanifest}', 'icons/*.png'],
-        globIgnores: ['data/**', 'screenshots/**', 'splash/**', 'og.png', '404.html'],
+        // mqtt (controle pelo celular) é carregado só quando o usuário ativa o controle: nem o pré-cache o baixa antes
+        globIgnores: ['data/**', 'screenshots/**', 'splash/**', 'og.png', '404.html', '**/mqtt*.js'],
         navigateFallback: `${BASE}index.html`,
         // páginas estáticas de canal/categoria/país (geradas depois do build) não podem virar o index.html do app
         navigateFallbackDenylist: [/^\/tv-livre\/data\//, /^\/tv-livre\/(canal|categoria|pais)\//],
