@@ -162,6 +162,26 @@ test.describe('com computador e celular', () => {
     await expect(tv.getByRole('button', { name: 'Remover dos favoritos' }).first()).toBeVisible();
   });
 
+  test('"tela inteira" do celular liga o layout de janela inteira e o computador mostra a saída; sair no computador atualiza o celular', async ({ browser }) => {
+    const tv = await (await computador(browser)).newPage();
+    const { caminho } = await ligarControle(tv);
+    await tv.keyboard.press('Escape'); // fecha a folha
+    const cel = await (await celular(browser)).newPage();
+    await parear(cel, caminho);
+    await cel.getByTestId('controle-tela').click();
+    await expect(tv.locator('html')).toHaveAttribute('data-tv', 'on');
+    await expect(tv.getByTestId('tv-sair')).toBeVisible(); // quem controla pelo celular nunca fica preso no Modo TV
+    await expect(cel.getByTestId('controle-tela')).toHaveAttribute('aria-pressed', 'true');
+    await tv.getByTestId('tv-sair').click(); // sai pelo botão do computador
+    await expect(tv.locator('html')).toHaveAttribute('data-tv', 'off');
+    await expect(cel.getByTestId('controle-tela')).toHaveAttribute('aria-pressed', 'false');
+    await cel.getByTestId('controle-tela').click(); // liga de novo e sai pelo Esc
+    await expect(tv.locator('html')).toHaveAttribute('data-tv', 'on');
+    await tv.locator('body').click({ position: { x: 700, y: 500 } });
+    await tv.keyboard.press('Escape');
+    await expect(tv.locator('html')).toHaveAttribute('data-tv', 'off');
+  });
+
   test('o computador reporta canal fora do ar e o celular oferece "Próximo canal"', async ({ browser }) => {
     const tv = await (await computador(browser)).newPage();
     const { caminho } = await ligarControle(tv);
