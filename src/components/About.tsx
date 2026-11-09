@@ -102,6 +102,14 @@ export function About({ visits }: { visits: number | null }) {
           Livre não passa o vídeo por nenhum servidor.
         </li>
         <li>
+          <strong>Controle pelo celular:</strong> só funciona depois que você ativa em <b>Mais › Controlar pelo celular</b>; antes disso nada é
+          carregado nem conectado. Ao ativar, o computador e o celular trocam <b>mensagens cifradas de ponta a ponta</b> (AES-GCM) por um
+          servidor público de mensagens (<a href="https://www.hivemq.com/mqtt/public-mqtt-broker/" target="_blank" rel="noopener noreferrer">HiveMQ</a>,
+          que enxerga apenas um identificador embaralhado e bytes ilegíveis, nunca os canais nem os comandos). A chave está no QR code e
+          no endereço depois do <code>#</code>, parte que o navegador <b>nunca envia</b> a servidores. O vídeo não passa por lá: ele
+          toca só no computador ou na TV. Quem tiver o QR ou o código controla o TV Livre até você tocar em <b>Encerrar o controle</b>.
+        </li>
+        <li>
           <strong>Modo Rádio e Econômico:</strong> a escolha do modo, do timer e o aviso de dados ficam só no seu aparelho. O consumo mostrado é
           calculado no seu navegador, somando os trechos que ele mesmo baixou; nada é enviado a ninguém.
         </li>

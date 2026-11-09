@@ -134,6 +134,10 @@ Na TV: sem barras, foco inicial em "Ligar a TV", setas movem o foco, tipografia 
 - **Prévia (OG).** 1200×630, preto quente, barra vertical de acento à esquerda, número gigante em condensado (acento), nome em Archivo expandida, marca no topo. **Sem logo do canal** (mesmos motivos da grade).
 - **Compartilhar.** Botão-tecla ao lado da estrela, no dial (alvo de 52–64 px). Folha modal com o texto que será enviado (régua de acento à esquerda) e três ações; na TV, QR code preto sobre branco (zona silenciosa de 3 módulos) com o endereço por extenso.
 
+## Controle pelo celular (`#/controle`)
+
+O celular é o controle remoto no sentido literal: uma mão, polegar embaixo. O **número do canal** é o maior elemento (acento), o nome em Archivo expandida e o estado da conexão numa etiqueta de canto pequeno (preto/papel; o acento só quando há problema). Sem cartões: teclas retangulares de canto pequeno, régua de 1,5 px, alvos de **48 a 72 px** (dial e Zapear 72 px; teclado numérico 60 px). **Zapear** é a única tecla preenchida com o acento; **Enter** é a inversão (texto sobre papel). Estados desenhados: conectando, reconectando, sem sinal, erro, encerrado, desconectado, limite de 3 celulares e versão diferente, sempre com o motivo em texto e a ação (tentar de novo, parear de novo, atualizar). Movimento: só o aperto de 1 px na tecla (120 ms), removido com `prefers-reduced-motion`. A folha no computador usa o mesmo vocabulário: QR preto sobre branco com zona silenciosa, **código em Archivo condensada com o acento** e a lista de celulares em linhas de régua (na TV, tipos de sala e botões focáveis).
+
 ## Paridade com a versão anterior (tag `pre-rebrand`)
 
 Preservado: índice por país e "Todos os países"; busca sem acento por relevância; filtros de categoria, idioma, status e
