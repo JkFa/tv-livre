@@ -82,6 +82,8 @@ test.describe('com computador e celular', () => {
     const cel = await (await celular(browser)).newPage();
     await parear(cel, caminho);
     expect(await cel.evaluate(() => location.hash)).toBe('#/controle'); // sem sessão nem chave no endereço
+    // o teste roda em localhost: a folha avisa que o QR não abriria num celular de verdade
+    await expect(tv.getByTestId('controle-aviso-local')).toContainText('QR code não vai abrir no celular');
     await expect(cel.getByTestId('controle-canal')).toContainText('Nenhum canal');
     await expect(tv.getByTestId('controle-celulares')).toContainText('Celular conectado · Android');
     await expect(tv.getByTestId('controle-celulares')).toContainText('(1/3)');

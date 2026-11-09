@@ -6,6 +6,7 @@ import { EMPTY_FILTERS, filterChannels } from '../lib/filter.ts';
 import { useFavorites, useRecents } from '../lib/library.ts';
 import { buildNumbers, channelKey, formatNumber } from '../lib/lineup.ts';
 import { useWakeLock } from '../lib/media.ts';
+import { ambienteAtual, problemaDeAmbiente } from '../lib/remote/ambiente.ts';
 import { lerLink, lerPar, limparPar, salvarPar, type Par } from '../lib/remote/celular.ts';
 import type { Estado } from '../lib/remote/protocolo.ts';
 import { derivarDoCodigo, normalizarCodigo } from '../lib/remote/seguranca.ts';
@@ -29,6 +30,16 @@ function parInicial(): Par | null {
 
 export default function Controle() {
   const [par, setPar] = useState<Par | null>(parInicial);
+  const problema = problemaDeAmbiente(ambienteAtual());
+  if (problema) {
+    return (
+      <main className="remote remote-parear" data-testid="controle-inseguro">
+        <h1>Controle remoto</h1>
+        <p className="remote-erro" role="alert">{problema}</p>
+        <a className="link-btn" href="#/">Voltar ao TV Livre</a>
+      </main>
+    );
+  }
   if (!par) return <Parear onPar={(p) => { salvarPar(p); setPar(p); }} />;
   return <Remoto par={par} onSair={() => { limparPar(); setPar(null); }} />;
 }

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { readSession, removeSession, writeSession } from '../storage.ts';
 import type { Acoes } from './acoes.ts';
 import type { Comando, Estado } from './protocolo.ts';
+import { ambienteAtual, problemaDeAmbiente } from './ambiente.ts';
 import type { Celular, Pareamento, Receptor } from './receptor.ts';
 
 const CHAVE_SESSAO = 'tvlivre:controle-sessao';
@@ -49,6 +50,8 @@ export function useControleRemoto(o: Opcoes) {
 
   const ativar = useCallback(async () => {
     if (rec.current) return;
+    const problema = problemaDeAmbiente(ambienteAtual()); // http:// sem WebCrypto: diz o motivo em vez de um erro cru
+    if (problema) return setV({ ...VAZIA, erro: problema });
     setV({ ...VAZIA, conectando: true });
     try {
       const [{ Receptor }, { criarTransporte }] = await Promise.all([import('./receptor.ts'), import('./criar.ts')]);

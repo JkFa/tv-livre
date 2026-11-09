@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Smartphone, Unplug } from 'lucide-react';
+import { avisoEnderecoLocal } from '../lib/remote/ambiente.ts';
 import { formatarCodigo } from '../lib/remote/seguranca.ts';
 import type { ControleRemoto } from '../lib/remote/useControleRemoto.ts';
 import { formatarRestante } from '../lib/timer.ts';
@@ -45,6 +46,7 @@ export function ControleSheet({ open, onClose, controle: c, tv }: Props) {
         {c.conectando && <p role="status">Conectando ao servidor de mensagens…</p>}
         {c.ativo && p && (
           <>
+            {avisoEnderecoLocal(window.location.hostname) && <p className="controle-erro" role="alert" data-testid="controle-aviso-local">{avisoEnderecoLocal(window.location.hostname)}</p>}
             <p className="controle-passo">{tv ? 'Aponte a câmera do celular para o QR code' : '1. Aponte a câmera do celular para o QR code'}</p>
             <Qr value={p.link} />
             {p.codigo ? (
