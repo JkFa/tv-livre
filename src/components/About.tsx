@@ -96,6 +96,10 @@ export function About({ visits }: { visits: number | null }) {
           transmissão, ele é baixado de novo só para retomar o controle. Quem busca o vídeo é a TV, direto da fonte do canal; o TV
           Livre não passa o vídeo por nenhum servidor.
         </li>
+        <li>
+          <strong>Modo Rádio e Econômico:</strong> a escolha do modo, do timer e o aviso de dados ficam só no seu aparelho. O consumo mostrado é
+          calculado no seu navegador, somando os trechos que ele mesmo baixou; nada é enviado a ninguém.
+        </li>
         <li>O app instalado guarda uma cópia da estrutura do site e da lista de canais para abrir offline. Nunca guarda vídeo.</li>
       </ul>
 

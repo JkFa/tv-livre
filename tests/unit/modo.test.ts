@@ -82,6 +82,13 @@ describe('MB/h e consumo', () => {
     expect(n.linha).not.toMatch(/MB\/h/);
     expect(textoConsumo('normal', { nativo: true, semVarianteAudio: false, audioOnly: false }, 0).aviso).toBeUndefined();
   });
+  it('lista de um nível só: diz que o modo não reduz o consumo (e não fica em "medindo")', () => {
+    const um = { nativo: false, semVarianteAudio: true, audioOnly: false, niveis: 1 };
+    expect(textoConsumo('economico', um, 3).aviso).toBe('Este canal tem uma única qualidade: o modo Econômico não reduz o consumo.');
+    expect(textoConsumo('radio', um, 3).aviso).toBe('Este canal tem uma única qualidade: o modo Rádio não reduz o consumo.');
+    expect(textoConsumo('radio', um, 3).linha).toBe('Consumo por hora: não informado por este canal · 3,0 MB nesta sessão');
+    expect(textoConsumo('normal', um, 0).aviso).toBeUndefined();
+  });
 });
 
 describe('plano de dados fraco e "Bom para ouvir"', () => {

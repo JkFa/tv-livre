@@ -113,6 +113,8 @@ export interface InfoConsumo {
   semVarianteAudio: boolean;
   /** Nível em uso é só áudio. */
   audioOnly: boolean;
+  /** Quantos níveis de qualidade a lista tem (1 = não dá para economizar mudando de nível). */
+  niveis?: number;
 }
 
 /** Textos honestos de consumo para a barra de modos. Nunca inventa número onde não dá para medir. */
@@ -124,8 +126,11 @@ export function textoConsumo(modo: ModoAudio, i: InfoConsumo | null, sessaoMB: n
       ...(modo !== 'normal' ? { aviso: 'Economia não garantida neste aparelho: o navegador escolhe a qualidade sozinho.' } : {}),
     };
   }
-  const porHora = i.bitrate ? `≈ ${formatarMB(mbPorHora(i.bitrate))} MB/h` : 'Consumo por hora: medindo…';
+  const porHora = i.bitrate ? `≈ ${formatarMB(mbPorHora(i.bitrate))} MB/h` : 'Consumo por hora: não informado por este canal';
   const linha = `${porHora} · ${formatarMB(sessaoMB)} MB nesta sessão`;
+  if (modo !== 'normal' && i.niveis === 1 && !i.audioOnly) {
+    return { linha, aviso: `Este canal tem uma única qualidade: o modo ${modo === 'radio' ? 'Rádio' : 'Econômico'} não reduz o consumo.` };
+  }
   if (modo === 'radio' && i.semVarianteAudio) {
     return { linha, aviso: `Este canal não tem versão só de áudio; o Rádio usa a menor qualidade de vídeo${i.bitrate ? ` (≈ ${formatarMB(mbPorHora(i.bitrate))} MB/h)` : ''}.` };
   }

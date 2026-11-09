@@ -53,7 +53,7 @@ export function aplicarModo(inst: HlsInstance, modo: ModoAudio, onInfo?: (i: Inf
   inst.autoLevelCapping = esc.index;
   inst.currentLevel = esc.index; // -1 = automático
   const emUso = esc.index >= 0 ? esc.index : inst.currentLevel;
-  onInfo?.({ nativo: false, bitrate: niveis[emUso]?.bitrate, semVarianteAudio: esc.semVarianteAudio, audioOnly: esc.audioOnly });
+  onInfo?.({ nativo: false, bitrate: niveis[emUso]?.bitrate || undefined, semVarianteAudio: esc.semVarianteAudio, audioOnly: esc.audioOnly, niveis: niveis.length });
 }
 
 /**
@@ -270,7 +270,7 @@ export function HlsStage({ channel, force = false, active, attempt, muted, video
       inst.on(Ctor.Events.LEVEL_SWITCHED, (_e, d) => {
         if (usandoAudio) return; // a lista de mídia da variante de áudio não declara bitrate; mantemos o da mestra
         const l = inst.levels[d.level];
-        if (l) cb.current.onInfo?.({ nativo: false, bitrate: nivelDe(l).bitrate, semVarianteAudio: escolherNivel(inst.levels.map(nivelDe), 'radio').semVarianteAudio, audioOnly: nivelDe(l).audioOnly });
+        if (l) cb.current.onInfo?.({ nativo: false, bitrate: nivelDe(l).bitrate || undefined, niveis: inst.levels.length, semVarianteAudio: escolherNivel(inst.levels.map(nivelDe), 'radio').semVarianteAudio, audioOnly: nivelDe(l).audioOnly });
       });
       inst.on(Ctor.Events.FRAG_LOADED, (_e, d) => cb.current.onBytes?.(d.frag.stats.loaded));
       inst.loadSource(s.url);
