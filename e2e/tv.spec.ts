@@ -87,7 +87,7 @@ test('Modo TV: Voltar fecha a grade; números digitam o canal; teclas coloridas 
 
   // verde = zapear; vermelho = favoritar o canal atual
   const t = await title(page);
-  await page.keyboard.press('F3'.replace('F3', 'Escape'));
+  // (aqui havia um Esc "solto" que era um Voltar sem efeito; no navegador o Esc agora sai do Modo TV, então foi removido)
   await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ColorF1Green', bubbles: true, cancelable: true })));
   await expect.poll(() => title(page)).not.toBe(t);
   await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ColorF0Red', bubbles: true, cancelable: true })));
@@ -135,4 +135,74 @@ test('Modo TV: a tela inicial abre com o foco em "Ligar a TV"; setas movem o foc
   await page.getByTestId('home-ligar').focus();
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/#\/canal\//);
+});
+
+test.describe('saída sempre visível do Modo TV (navegador)', () => {
+  test('o botão "Sair do modo TV" está sempre na tela: vendo o canal, com a grade aberta e na tela inicial', async ({ page }) => {
+    await page.goto('./#/canais');
+    const sair = page.getByTestId('tv-sair');
+    await expect(sair).toBeVisible();
+    await expect(sair).toContainText('Sair do modo TV');
+    await expect(sair).toContainText('T');
+    const caixa = await sair.boundingBox();
+    expect(caixa!.height).toBeGreaterThanOrEqual(44);
+    await page.locator('body').click({ position: { x: 700, y: 700 } });
+    await page.keyboard.press('ArrowRight'); // abre a grade
+    await expect(page.locator('.grade')).toHaveAttribute('data-open', 'true');
+    await expect(sair).toBeVisible(); // continua visível com a grade aberta
+    await page.goto('./#/');
+    await expect(sair).toBeVisible(); // e na tela inicial
+    await page.goto('./#/sobre');
+    await expect(sair).toBeVisible(); // e nas páginas de texto
+  });
+
+  test('clicar no botão sai do Modo TV e o botão some; o modo fica desligado', async ({ page }) => {
+    await page.goto('./#/canais');
+    await page.getByTestId('tv-sair').click();
+    await expect(page.locator('html')).toHaveAttribute('data-tv', 'off');
+    await expect(page.getByTestId('tv-sair')).toHaveCount(0);
+    expect(await page.evaluate(() => localStorage.getItem('tvlivre:modo-tv'))).toBe('desligado');
+  });
+
+  test('Esc sai do Modo TV; com a grade aberta, o primeiro Esc só fecha a grade', async ({ page }) => {
+    await page.goto('./#/canais');
+    await page.locator('body').click({ position: { x: 700, y: 700 } });
+    await page.keyboard.press('ArrowRight');
+    await expect(page.locator('.grade')).toHaveAttribute('data-open', 'true');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.grade')).not.toHaveAttribute('data-open', 'true');
+    await expect(page.locator('html')).toHaveAttribute('data-tv', 'on');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('html')).toHaveAttribute('data-tv', 'off');
+  });
+
+  test('Esc também sai na tela inicial, e o mouse continua visível enquanto o botão está na tela', async ({ page }) => {
+    await page.goto('./#/');
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement).cursor)).toBe('auto');
+    await page.locator('body').click({ position: { x: 5, y: 5 } });
+    await page.keyboard.press('Escape');
+    await expect(page.locator('html')).toHaveAttribute('data-tv', 'off');
+  });
+
+  test('a lista de atalhos mostra como sair', async ({ page }) => {
+    await page.goto('./#/canais');
+    await page.locator('body').click({ position: { x: 700, y: 700 } });
+    await page.keyboard.press('?');
+    await expect(page.getByRole('dialog')).toContainText('Sair do Modo TV (no navegador)');
+  });
+
+  test.describe('TV de verdade (detectada sozinha)', () => {
+    test.use({ userAgent: 'Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76 TV Safari/537.36' });
+    test('o botão fica escondido, o mouse segue oculto e o Voltar da TV continua sendo da TV', async ({ page }) => {
+      await page.addInitScript(() => localStorage.removeItem('tvlivre:modo-tv')); // automático
+      await page.addInitScript(() => localStorage.setItem('tvlivre:modo-tv', 'auto'));
+      await page.goto('./#/canais');
+      await expect(page.locator('html')).toHaveAttribute('data-tv', 'on');
+      await expect(page.getByTestId('tv-sair')).toHaveCount(0);
+      expect(await page.evaluate(() => getComputedStyle(document.documentElement).cursor)).toBe('none');
+      await page.locator('body').click({ position: { x: 700, y: 700 } });
+      await page.keyboard.press('Escape'); // Voltar do controle remoto: não sai do Modo TV
+      await expect(page.locator('html')).toHaveAttribute('data-tv', 'on');
+    });
+  });
 });

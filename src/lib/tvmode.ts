@@ -21,6 +21,12 @@ export const setTvPref = (p: TvPref): void => writeString(KEY, p);
 
 export const resolveTv = (pref: TvPref, detected: boolean = detectTv()): boolean => (pref === 'auto' ? detected : pref === 'ligado');
 
+/**
+ * O botão "Sair do modo TV" (sempre visível) aparece quando o modo foi ligado à mão (?tv=1, menu, tecla T, celular).
+ * Em uma TV de verdade (detectada sozinha) fica escondido: o controle remoto não clica e o botão só taparia o vídeo.
+ */
+export const mostrarBotaoSair = (pref: TvPref, detected: boolean = detectTv()): boolean => resolveTv(pref, detected) && pref !== 'auto';
+
 export function applyTv(on: boolean): void {
   document.documentElement.dataset.tv = on ? 'on' : 'off';
 }

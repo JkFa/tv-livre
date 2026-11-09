@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { pickNext, type Box } from '../../src/lib/spatial.ts';
-import { detectTv, remoteKey, resolveTv } from '../../src/lib/tvmode.ts';
+import { detectTv, remoteKey, resolveTv, mostrarBotaoSair } from '../../src/lib/tvmode.ts';
 
 const box = (left: number, top: number, w = 100, h = 60): Box => ({ left, top, right: left + w, bottom: top + h });
 
@@ -85,5 +85,20 @@ describe('Modo TV', () => {
     expect(remoteKey({ key: 'Unidentified', keyCode: 403 })).toBe('red');
     expect(remoteKey({ key: 'ColorF1Green', keyCode: 0 })).toBe('green');
     expect(remoteKey({ key: 'a', keyCode: 65 })).toBeNull();
+  });
+});
+
+describe('mostrarBotaoSair (saída sempre visível do Modo TV)', () => {
+  it('modo ligado à mão (navegador): visível', () => {
+    expect(mostrarBotaoSair('ligado', false)).toBe(true);
+    expect(mostrarBotaoSair('ligado', true)).toBe(true);
+  });
+  it('desligado: não há o que sair', () => {
+    expect(mostrarBotaoSair('desligado', false)).toBe(false);
+    expect(mostrarBotaoSair('desligado', true)).toBe(false);
+  });
+  it('automático: só liga em TV de verdade e aí o botão fica escondido (o controle remoto não clica)', () => {
+    expect(mostrarBotaoSair('auto', true)).toBe(false);
+    expect(mostrarBotaoSair('auto', false)).toBe(false);
   });
 });

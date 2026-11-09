@@ -1,6 +1,6 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
-import { ChevronDown, Download, Keyboard, Moon, Search, SlidersHorizontal, Sun, Tv, X } from 'lucide-react';
+import { ChevronDown, Download, Keyboard, LogOut, Moon, Search, SlidersHorizontal, Sun, Tv, X } from 'lucide-react';
 import type { Channel, DataIndex } from '../shared/types.ts';
 import { About } from './components/About.tsx';
 import { BottomNav, type Section } from './components/BottomNav.tsx';
@@ -32,7 +32,7 @@ import { readString, writeString } from './lib/storage.ts';
 import { fetchRegion, type Region } from './lib/region.ts';
 import { channelShareLink, loadPaginas, peekSlug, shareText } from './lib/share.ts';
 import { useShortcuts } from './lib/shortcuts.ts';
-import { applyTv, getTvPref, resolveTv, setTvPref, type TvPref } from './lib/tvmode.ts';
+import { applyTv, getTvPref, mostrarBotaoSair, resolveTv, setTvPref, type TvPref } from './lib/tvmode.ts';
 import { useCast } from './lib/useCast.ts';
 import { useTvRemote } from './lib/tvremote.ts';
 
@@ -286,6 +286,10 @@ export default function App() {
   useEffect(() => {
     applyTv(tv);
   }, [tv]);
+  const saidaVisivel = tv && mostrarBotaoSair(tvPref);
+  useEffect(() => {
+    document.documentElement.toggleAttribute('data-tv-saida', saidaVisivel);
+  }, [saidaVisivel]);
   const guideShown = tv && guideOpen;
   const openGuide = useCallback(() => {
     setGuideOpen(true);
@@ -342,6 +346,7 @@ export default function App() {
     shuffle,
     toggleFavorite: () => selected && toggle(selected),
     openFilters: () => setSheet('filters'),
+    ...(mostrarBotaoSair(tvPref) ? { exit: () => changeTvPref('desligado') } : {}),
     searchGuide: () => {
       openGuide();
       requestAnimationFrame(() => searchRef.current?.focus());
@@ -729,6 +734,12 @@ export default function App() {
             )}
           </aside>
         </main>
+      )}
+
+      {saidaVisivel && (
+        <button type="button" className="tv-exit" onClick={() => changeTvPref('desligado')} data-testid="tv-sair" title="Sair do modo TV (T ou Esc)">
+          <LogOut size={20} aria-hidden="true" /> Sair do modo TV <kbd>T</kbd>
+        </button>
       )}
 
       <BottomNav

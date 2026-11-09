@@ -79,3 +79,17 @@ html[data-tv='on'] .sheet .btn, html[data-tv='on'] .sheet .seg button, html[data
 @media (prefers-reduced-motion: reduce) {
   html[data-tv='on'] .grade, html[data-tv='on'] .grade[data-open='true'] { transition: none; }
 }
+
+/* Saída sempre visível do Modo TV no navegador (a tecla T e Esc também saem). Fica no canto superior esquerdo:
+   o canto direito é da vinheta dos números e do painel da grade. Fundo sólido para ler sobre qualquer vídeo. */
+.tv-exit { display: none; }
+html[data-tv='on'] .tv-exit {
+  position: fixed; top: 12px; left: 12px; z-index: 60; display: inline-flex; align-items: center; gap: 8px;
+  min-height: 48px; padding: 0 14px; background: #15110e; color: #f1e9d8; border: 2px solid #f1e9d8;
+  border-radius: var(--r-s); font: 700 16px/1 var(--font-text); cursor: pointer;
+}
+html[data-tv='on'] .tv-exit:hover { background: #2a241d; }
+html[data-tv='on'] .tv-exit kbd { padding: 2px 7px; border: 1.5px solid #a79e8e; border-radius: 3px; font: 700 13px/1.3 var(--font-text); color: #a79e8e; }
+html[data-tv='on'] .tv-exit:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+/* no navegador (botão de saída na tela) o mouse não some; em TV de verdade segue escondido */
+html[data-tv='on'][data-tv-saida] { cursor: auto; }
