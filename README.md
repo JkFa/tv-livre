@@ -12,7 +12,7 @@ aplicativo instalável. Sem cadastro, sem anúncios, sem cobrança, e **sem hosp
 - O site é 100% estático (React + Vite + TypeScript) e toca HLS com [hls.js](https://github.com/video-dev/hls.js), ou com o
   HLS nativo do navegador onde o hls.js não existe (Safari do iPhone). YouTube usa o embed oficial.
 - O navegador acessa **diretamente** a fonte do vídeo: não há backend, proxy, retransmissão nem gravação.
-- Interface em português do Brasil, claro e escuro, mobile primeiro.
+- Interface em português do Brasil, mobile primeiro. **O padrão é o tema claro** (mesmo com o sistema no escuro); o ícone de lua/sol na barra do topo, **inclusive no celular**, alterna claro e escuro com um toque, e **Mais › Tema** também oferece "Automático" (segue o sistema). A escolha fica em `tvlivre:tema`.
 - **Guia de programação** ("Agora" e "A seguir"), **páginas indexáveis por canal** (Google e prévia bonita no WhatsApp) e botão **Compartilhar**.
 
 ### A marca: "o controle remoto reinventado"

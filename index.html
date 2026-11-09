@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="pt-BR" data-theme="auto">
+<html lang="pt-BR" data-theme="light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>TV Livre — TV aberta ao vivo</title>
     <meta name="description" content="TV Livre: um controle remoto para a TV aberta pela internet. Canais do Brasil e do mundo ao vivo no navegador, com zapear, favoritos e app instalável. Sem cadastro e sem anúncios." />
-    <meta name="theme-color" content="#15110e" />
-    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#efe6d2" />
+    <meta name="color-scheme" content="light dark" />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
     <meta name="robots" content="index, follow" />
     <link rel="canonical" href="https://jkfa.github.io/tv-livre/" />
@@ -52,10 +52,12 @@
     <script>
       // aplica o tema salvo antes da primeira pintura (evita piscar claro/escuro)
       try {
+        // o padrão é o tema CLARO (só 'escuro' ou 'auto' escolhidos pelo usuário mudam isso)
         var t = localStorage.getItem('tvlivre:tema');
         var r = document.documentElement;
-        r.dataset.theme = t === 'claro' ? 'light' : t === 'escuro' ? 'dark' : 'auto';
-        var dark = t === 'escuro' || (t !== 'claro' && matchMedia('(prefers-color-scheme: dark)').matches);
+        var pref = t === 'escuro' || t === 'auto' ? t : 'claro';
+        r.dataset.theme = pref === 'escuro' ? 'dark' : pref === 'auto' ? 'auto' : 'light';
+        var dark = pref === 'escuro' || (pref === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
         document.querySelector('meta[name="theme-color"]').setAttribute('content', dark ? '#15110e' : '#efe6d2');
       } catch (e) {}
     </script>
