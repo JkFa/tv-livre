@@ -8,6 +8,8 @@ import { channelKey, formatNumber } from '../lib/lineup.ts';
 import { StatusMark } from './Badges.tsx';
 import { Mark, Wordmark } from './Mark.tsx';
 import { VisitStrip } from './Visits.tsx';
+import { fmtNum, type EmAlta } from '../lib/presenca-ui.ts';
+import type { Resumo } from '../lib/presenca.ts';
 import type { Region } from '../lib/region.ts';
 import { TestCard } from './TestCard.tsx';
 
@@ -28,6 +30,9 @@ interface Props {
   /** Total de acessos ao site e região de quem acessa (null enquanto carregam ou se o serviço falhar). */
   visits: number | null;
   region: Region | null;
+  /** Serviço de presença: total assistindo, recordes e o que está "em alta agora" (null = sem serviço). */
+  presenca?: Resumo | null;
+  emAlta?: readonly EmAlta[];
   tv: boolean;
   onTune: (c: Channel) => void;
   onPower: () => void;
@@ -175,8 +180,14 @@ export function Home(p: Props) {
           <div><dt>países</dt><dd className="num">{nf.format(index.countries.length)}</dd></div>
           <div><dt>curados pelo Free-TV</dt><dd className="num">{nf.format(index.meta.bySource['free-tv'])}</dd></div>
         </dl>
-        <VisitStrip total={p.visits} region={p.region} />
+        <VisitStrip total={p.visits} region={p.region} presenca={p.presenca ?? null} />
         <p className="stats-note muted small">Lista conferida a cada dia. Última em {updated}.</p>
+
+        {!!p.emAlta?.length && (
+          <Rail title="Em alta agora">
+            {p.emAlta.map(({ channel, n: quantos }) => <Tile key={channelKey(channel)} c={channel} n={num(channel)} onTune={p.onTune} showCountry={channel.country !== country} watching={quantos} />)}
+          </Rail>
+        )}
 
         {p.recents.length > 0 && (
           <Rail title="Vistos há pouco">
@@ -302,7 +313,7 @@ function Rail({ title, action, busy = false, children }: { title: string; action
   );
 }
 
-function Tile({ c, n, onTune, showCountry = false, star = false, prog }: { c: Channel; n: string; onTune: (c: Channel) => void; showCountry?: boolean; star?: boolean; prog?: string }) {
+function Tile({ c, n, onTune, showCountry = false, star = false, prog, watching }: { c: Channel; n: string; onTune: (c: Channel) => void; showCountry?: boolean; star?: boolean; prog?: string; watching?: number }) {
   const cat = c.categories[0] ? categoryLabel(c.categories[0]) : null;
   const meta = [cat, showCountry ? countryName(c.country) : null].filter(Boolean).join(' · ');
   return (
@@ -312,6 +323,12 @@ function Tile({ c, n, onTune, showCountry = false, star = false, prog }: { c: Ch
         <span className="tile-body">
           <span className="tile-name">{c.name}</span>
           {prog && <span className="tile-prog">{prog}</span>}
+          {watching !== undefined && (
+            <span className="tile-watching" data-testid="em-alta-contagem">
+              <span className="live-dot" aria-hidden="true" />
+              {fmtNum(watching)} assistindo
+            </span>
+          )}
           <span className="tile-meta">
             <StatusMark status={c.status} withText={c.status !== 'online'} />
             {star && <Star size={13} aria-hidden="true" className="tile-star" />}

@@ -12,9 +12,11 @@ export interface Filters {
   startingNow: boolean;
   /** "Bom para ouvir": notícias, música, religião, conversa, esportes e educação. */
   listen: boolean;
+  /** "Mais assistidos agora": só os canais do top público do serviço de presença, do mais para o menos assistido. */
+  trending: boolean;
 }
 
-export const EMPTY_FILTERS: Filters = { query: '', category: '', language: '', status: '', playableOnly: false, startingNow: false, listen: false };
+export const EMPTY_FILTERS: Filters = { query: '', category: '', language: '', status: '', playableOnly: false, startingNow: false, listen: false, trending: false };
 
 export function normalizeSearch(text: string): string {
   return text
@@ -46,7 +48,7 @@ export function compareForDisplay(a: Channel, b: Channel): number {
 }
 
 /** Filtra e, havendo busca, ordena por relevância (prefixo > início de palavra > contém). */
-export function filterChannels(list: readonly Channel[], f: Filters, ctx: { startingNow?: (c: Channel) => boolean } = {}): Channel[] {
+export function filterChannels(list: readonly Channel[], f: Filters, ctx: { startingNow?: (c: Channel) => boolean; assistindo?: ReadonlyMap<string, number> } = {}): Channel[] {
   const q = normalizeSearch(f.query);
   const tokens = q ? q.split(' ') : [];
   const scored: { ch: Channel; score: number }[] = [];
@@ -58,6 +60,7 @@ export function filterChannels(list: readonly Channel[], f: Filters, ctx: { star
     if (f.playableOnly && !isPlayableHere(ch, caps())) continue;
     if (f.startingNow && !ctx.startingNow?.(ch)) continue;
     if (f.listen && !bomParaOuvir(ch.categories)) continue;
+    if (f.trending && !ctx.assistindo?.has(`${ch.country}/${ch.id}`)) continue;
     let score = 0;
     if (tokens.length) {
       const key = searchKey(ch);
@@ -66,7 +69,10 @@ export function filterChannels(list: readonly Channel[], f: Filters, ctx: { star
     }
     scored.push({ ch, score });
   }
-  if (tokens.length) scored.sort((a, b) => b.score - a.score);
+  if (f.trending && ctx.assistindo) {
+    const n = (c: Channel) => ctx.assistindo?.get(`${c.country}/${c.id}`) ?? 0;
+    scored.sort((a, b) => n(b.ch) - n(a.ch) || b.score - a.score);
+  } else if (tokens.length) scored.sort((a, b) => b.score - a.score);
   return scored.map((s) => s.ch);
 }
 
