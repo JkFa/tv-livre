@@ -5,7 +5,7 @@
 // concentram a maioria), troca de canal a cada 45–90 s, manda "ping" a cada 60 s e lê as difusões. Mede mensagens recebidas
 // e o CPU/memória dos processos `workerd` (Linux) para alimentar a tabela de custo (custos.mjs).
 import { spawn } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
