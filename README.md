@@ -11,7 +11,7 @@ aplicativo instalável. Sem cadastro, sem anúncios, sem cobrança, e **sem hosp
 - Um pipeline em TypeScript baixa as fontes, normaliza, remove duplicatas, exclui conteúdo adulto, classifica e **testa cada link**.
 - O site é 100% estático (React + Vite + TypeScript) e toca HLS com [hls.js](https://github.com/video-dev/hls.js), ou com o
   HLS nativo do navegador onde o hls.js não existe (Safari do iPhone). YouTube usa o embed oficial.
-- O navegador acessa **diretamente** a fonte do vídeo: não há backend, proxy, retransmissão nem gravação.
+- O navegador acessa **diretamente** a fonte do vídeo: não há backend de vídeo, proxy, retransmissão nem gravação. Há só um **contador de presença** (Cloudflare Worker) para o "assistindo agora"; sem ele, o site funciona igual.
 - Interface em português do Brasil, mobile primeiro. **O padrão é o tema claro** (mesmo com o sistema no escuro); o ícone de lua/sol na barra do topo, **inclusive no celular**, alterna claro e escuro com um toque, e **Mais › Tema** também oferece "Automático" (segue o sistema). A escolha fica em `tvlivre:tema`.
 - **Guia de programação** ("Agora" e "A seguir"), **páginas indexáveis por canal** (Google e prévia bonita no WhatsApp) e botão **Compartilhar**.
 
@@ -123,23 +123,133 @@ arquivos de `data/`. Sem internet o app abre e mostra favoritos e canais já vis
 conexão**. **Vídeo nunca é interceptado nem guardado** (só `data/*` e os arquivos do app passam pelo service worker).
 Quando há versão nova aparece "Atualizar"; a atualização **nunca recarrega sozinha** (nem durante a reprodução).
 
-## Contador de acessos
+## Contador de acessos e "assistindo agora"
 
-Serviço: **[Abacus](https://abacus.jasoncameron.dev)** (gratuito, sem chave, sem cookies, CORS aberto). Escolhido após
-testar de verdade a partir da origem `https://jkfa.github.io`: o CounterAPI v2 exige conta/workspace e o hits.sh não devolve JSON.
+O site continua **sem backend de vídeo e sem proxy**: o vídeo vai direto da fonte para o navegador. O que existe agora é um
+**serviço mínimo de presença** (`workers/presenca`, um Cloudflare Worker + Durable Object) que só **conta conexões**:
+quantas pessoas estão com o TV Livre aberto, quantas estão com um canal tocando e quantas em cada canal. Ele nunca vê
+nem toca vídeo.
 
-- Conta **no máximo uma visita por sessão** (`sessionStorage`, vale também para o app instalado) com `GET /hit/tvlivre-jkfa/acessos`.
-- Só conta no site publicado, sem automação (`navigator.webdriver`). Nunca em `localhost`, nem nos testes.
-- Mostra o total em formato brasileiro (ex.: `128.402 acessos`), exatamente o valor devolvido pelo serviço, em três lugares: bloco
-  grande na **tela inicial**, faixa fixa no **topo do computador** (todas as páginas) e página **Sobre**. Ambiente local, testes e
-  automação só **leem** o total (`GET /get/...`). Se o serviço falhar ou não houver internet, o contador some.
-- Não envia dados pessoais: `credentials: 'omit'`, `referrerPolicy: 'no-referrer'`, só o nome do contador.
-- **Região de quem acessa** ("Você está acessando de Minas Gerais, Brasil"): o navegador consulta o **[ipwho.is](https://ipwho.is)**
-  (HTTPS, CORS aberto, sem chave), que enxerga o IP de quem pergunta. Pedimos só `region`, `country` e `country_code` (sem cidade),
-  sem cookies e sem referência (`src/lib/region.ts`). A resposta fica só em `sessionStorage` (uma consulta por sessão) e nunca é
-  enviada ao contador nem guardada pelo TV Livre. Se o serviço falhar, só a região some. A página Sobre explica isso ao usuário.
-- Limitação inerente: o contador é um endereço público; qualquer pessoa pode chamá-lo. O número é uma contagem de visitas
-  sem verificação, não uma métrica auditada.
+```
+navegador ──WebSocket──▶ Worker (confere Origin) ──▶ Durable Object "Sala" (uma só, com hibernação)
+   ▲                                                    │ guarda por conexão: navegando|assistindo, id do canal, país
+   └──── resumo a cada ≥ 3 s, só se mudou ◀─────────────┘ conta, monta o top 10, grava recordes (em lote)
+```
+
+Os números na tela: `● 37 assistindo agora · 12.408 acessos` (topo do computador e tela inicial), **"23 assistindo este canal"** no
+player, o bloco **"Em alta agora"** (top 5) na tela inicial, o filtro **"Mais assistidos agora"**, a faixa e o "Em alta" do
+**Modo TV** e os **recordes** (acessos hoje, pico de pessoas assistindo e o dia dele) na página **Sobre**. O ponto vermelho
+pulsa devagar (só opacidade) e fica parado com `prefers-reduced-motion`. Só o total "assistindo agora" é uma região `aria-live`,
+com no máximo um anúncio a cada 30 s.
+
+### O que é enviado e o que NÃO é (privacidade)
+
+- **Enviado:** "estou assistindo o canal `BR/globo`" ou "estou navegando". Mais nada.
+- **Não existe:** cookie, conta, impressão digital do aparelho, identificador persistente. O id de cada aba é aleatório, vive em
+  `sessionStorage` (`tvlivre:presenca-aba`) e **nunca sai do navegador**: serve só para as abas do mesmo navegador se entenderem.
+- **IP:** o Worker vê o endereço no instante da conexão, só para limitar abuso (no máximo 10 conexões por endereço), **apenas em memória**,
+  sem gravar. O armazenamento guarda só: total de acessos, acessos de hoje, recorde de pessoas assistindo e a data dele.
+- **Canal pequeno some:** a contagem de um canal só é divulgada com **3 ou mais** pessoas (o serviço nem envia menos; o site confere de novo).
+- **Estimativa:** é o número de conexões abertas, não uma métrica auditada.
+- **Sem serviço, o site é o de sempre:** sem `VITE_PRESENCA_URL`, ou com o serviço fora do ar, os números simplesmente **somem** e o
+  vídeo, o zapear e tudo mais continuam. Nada é contado em `localhost`, em testes nem sob automação (`navigator.webdriver`).
+
+### Como o cliente se comporta (`src/lib/presenca.ts`)
+
+- **Uma conexão por navegador:** a aba "líder" (eleita por Web Locks) abre o WebSocket; as outras falam com ela por `BroadcastChannel`.
+  Duas abas = uma conexão. Se a líder fecha, outra assume.
+- **Quando conecta:** depois da carga da página **e** da primeira interação (ou 3 s, o que vier primeiro).
+- **Estados:** `assistindo` (+ canal) quando o vídeo **está tocando** (evento `playing`, não pausado) e ao trocar de canal;
+  `navegando` ao pausar, dar erro ou sair do player. Mensagens agrupadas: no máximo 1 a cada 2 s, e a mais recente sempre vence.
+- **Segundo plano:** aba oculta que ainda toca continua contando; sem tocar, fecha a conexão após 2 min e reabre ao voltar.
+- **Reconexão:** espera exponencial de 1 s a 60 s com sorteio (±25%), e **desiste após 5 falhas seguidas** até a próxima interação.
+- **Ping** de 60 s (o runtime responde sem acordar o objeto); o servidor derruba conexões mudas por 150 s.
+- A visita é registrada **uma vez por sessão** (`POST /acesso`, mesma regra de antes). O **Abacus** continua só como **leitura de reserva**
+  do total (e é de onde o serviço novo parte, uma única vez, para o número não cair).
+
+### Limites do plano gratuito e custo (consultados em 2026-11-09)
+
+Documentação: [preços do Durable Objects](https://developers.cloudflare.com/durable-objects/platform/pricing/) ·
+[limites do Durable Objects](https://developers.cloudflare.com/durable-objects/platform/limits/) ·
+[limites do Workers](https://developers.cloudflare.com/workers/platform/limits/) ·
+[WebSockets e hibernação](https://developers.cloudflare.com/durable-objects/best-practices/websockets/) ·
+[preços do Workers](https://developers.cloudflare.com/workers/platform/pricing/).
+
+| Recurso (plano gratuito, zera às 00:00 UTC) | Limite |
+|---|---|
+| Requisições de Worker | 100.000 / dia |
+| Requisições de Durable Object (HTTP, alarmes, **mensagens WebSocket recebidas na razão 20:1**) | 100.000 / dia |
+| Duração do Durable Object | 13.000 GB-s / dia (128 MB, só enquanto ativo; hibernando não conta) |
+| Linhas gravadas (SQLite; cada `setAlarm` = 1) | 100.000 / dia |
+| Mensagens enviadas e *pings* de protocolo | sem cobrança |
+
+Cálculo em `workers/presenca/custos.mjs` (premissas: visita de 20 min, 6 trocas de canal, ping de 60 s, difusão a cada 3 s **no pior caso**,
+ou seja, sempre há mudança; `node custos.mjs --ping 30 …` recalcula com outros números):
+
+| Simultâneos | Horas/dia nesse nível | Visitas/dia | Worker (100 mil) | Durable Object (100 mil) | Linhas (100 mil) | GB-s (13 mil) | Cabe no gratuito? |
+|---:|---:|---:|---|---|---|---|---|
+| 100 | 8 | 2.400 | 5% | 18% | 12% | 0% | sim |
+| 100 | 24 | 7.200 | 15% | 55% | 35% | 1% | sim |
+| 1.000 | 2 | 6.000 | 12% | 23% | 3% | 0% | sim |
+| 1.000 | 8 | 24.000 | 48% | **92%** | 12% | 1% | sim (no limite) |
+| 1.000 | 24 | 72.000 | 145% | 276% | 35% | 3% | **não** (plano pago: ≈ US$ 6,09/mês) |
+| 5.000 | 2 | 30.000 | 61% | 105% | 3% | 1% | **não** (≈ US$ 5,32/mês) |
+| 5.000 | 8 | 120.000 | 242% | 420% | 12% | 4% | **não** (≈ US$ 6,74/mês) |
+
+Leitura: **100 pessoas simultâneas cabem no gratuito o dia todo; 1.000 cabem por até ~8,7 h/dia; 5.000 só por ~1,9 h/dia.** Acima disso o
+Durable Object passa de 100 mil requisições/dia e o plano pago (US$ 5/mês de mínimo) cobre com folga (a duração, em GB-s, nunca é o gargalo).
+O custo por visita é ≈ 2 requisições de Worker e ≈ 3,4 do Durable Object.
+
+**Como chegamos a 1.000 sem estourar** (o roteiro pedia ajustar os intervalos se não coubesse): com *ping* e varredura de 30 s o cenário de
+1.000 × 8 h dava **117%** do Durable Object (≈ 116.640 requisições). Subir o *ping* para 60 s (um meio-termo: segura a conexão aberta atrás de redes móveis e NAT, que costumam fechar conexões ociosas, sem pesar na cota; a documentação
+consultada não fixa um tempo máximo de ociosidade do WebSocket, então 60 s é uma escolha nossa, não um número da Cloudflare), a varredura para 60 s, gravar contadores em lote (a cada 15 s, em vez de 1 linha por visita: sem isso 72 mil visitas/dia
+já estourariam as 100 mil linhas) e rearmar o alarme só quando houve mudança leva a **92%** (≈ 92.160). Se o *ping* automático do runtime
+não contar como requisição (a documentação não diz de forma explícita), cai para 68%.
+
+**Teste de carga** (`workers/presenca/carga.mjs`, fora do CI, contra `wrangler dev` local): **500 conexões por 5 min, 0 falhas**; cada cliente
+recebeu uma difusão a cada ~3,4 s (o piso de 3 s se mantém sob mudança constante de ~8 trocas/s), 436 bytes por difusão, CPU do `workerd` ≈ **11% de um
+núcleo**. O teste valida comportamento e carga; **o consumo cobrado vem do modelo** (a cobrança só existe na Cloudflare).
+
+**Escalabilidade (não implementada de propósito):** hoje há **uma sala só**; um Durable Object atende bem alguns milhares de conexões, mas cada
+difusão é O(conexões). Passando de ~10 mil simultâneos, o caminho é fatiar a sala por país/canal (vários objetos que informam totais a um agregador). Não faz sentido antes de precisar.
+
+**Por que não outras opções:** *Firebase Realtime Database* (plano Spark: 100 conexões simultâneas) e *Supabase Realtime* (plano Free: 200 conexões e 100 mensagens/s)
+têm tetos baixos demais para um pico; *broker MQTT público* (o do controle remoto) deixa **qualquer pessoa publicar**, então qualquer um forjaria "10 mil assistindo".
+O Durable Object é o único que permite conferir `Origin`, validar cada mensagem e limitar abuso no servidor, de graça, com WebSocket de baixo custo (hibernação).
+
+**Abuso:** `Origin` conferida antes de acordar o objeto (só `https://jkfa.github.io`; `localhost`/`127.0.0.1` apenas com `AMBIENTE=dev`), mensagens de até 200 bytes,
+validadas (id de canal `[A-Za-z0-9._@~-]{1,100}`), rajada de 3 e depois 1 mensagem a cada 2 s por conexão, 10 conexões por IP, 30 acessos por IP/hora. Não é
+à prova de um atacante determinado (a contagem é pública por natureza), mas torna a inflação cara e visível.
+
+### Rodar e testar localmente
+
+Requer **Node 22** (o `wrangler` exige 22.12+).
+
+```bash
+cd workers/presenca && npm ci
+npm test            # 28 testes no runtime real do Workers (@cloudflare/vitest-plugin)
+npm run typecheck
+npm run dev         # wrangler dev em http://127.0.0.1:8787 (use --var AMBIENTE:dev para aceitar localhost)
+node carga.mjs      # teste de carga manual (500 conexões, 5 min)
+node custos.mjs     # tabela de consumo contra os limites gratuitos
+```
+
+Para ver o site falando com o serviço local, abra o console em `http://localhost:5173/tv-livre/` e rode
+`localStorage.setItem('tvlivre:presenca-teste', 'http://127.0.0.1:8787')` (liga a presença mesmo em localhost e sob automação).
+O E2E (`e2e/presenca.spec.ts`) faz isso sozinho, subindo o `wrangler dev` e vários navegadores isolados.
+
+### Publicar o serviço (você ainda não fez; nada é publicado sem isto)
+
+1. Crie uma conta gratuita em <https://dash.cloudflare.com/sign-up> (não pede cartão para o plano gratuito de Workers).
+2. Em **Workers & Pages**, defina o subdomínio `workers.dev` da conta quando o painel pedir. O Worker ficará em `https://tvlivre-presenca.<seu-subdominio>.workers.dev`.
+3. Copie o **Account ID** (painel › Workers & Pages › barra lateral direita).
+4. Crie um **API Token** em *My Profile › API Tokens › Create Token › Create Custom Token* com a permissão mínima **Account › Workers Scripts › Edit**,
+   restrita à sua conta. (Se o primeiro deploy reclamar de outra permissão, a mensagem de erro diz qual falta; não a adicione sem necessidade.)
+5. No GitHub, em *Settings › Secrets and variables › Actions*: crie os **secrets** `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID`.
+6. Rode o workflow **Publicar serviço de presença** (Actions › Run workflow). Ele testa e faz `wrangler deploy`; copie o endereço que aparece no log.
+7. Ainda em *Secrets and variables › Actions › Variables*, crie a **variável** `PRESENCA_URL` com esse endereço (não é segredo) e rode **Publicar TV Livre**.
+
+Sem os secrets o workflow só avisa e não publica; sem `PRESENCA_URL` o site é construído como antes. Uma falha do serviço **nunca** bloqueia a publicação do site.
 
 ## Modo TV (controle remoto)
 
@@ -281,7 +391,7 @@ Opções do pipeline (`tsx scripts/build-data.ts …`): `--no-probe`, `--limit N
 
 O workflow [`deploy.yml`](.github/workflows/deploy.yml) roda **a cada push na `main`, duas vezes por dia (06:17 UTC completa; 18:17 UTC só o guia) e manualmente**
 (`workflow_dispatch`): lint → tipos → testes unitários → pipeline de dados → guia de programação (opcional) → build → páginas indexáveis → testes E2E (Playwright) → publicação
-no GitHub Pages com `actions/deploy-pages`. Qualquer etapa que falhe impede a publicação, **exceto o guia**, que só gera aviso.
+no GitHub Pages com `actions/deploy-pages`. Qualquer etapa que falhe impede a publicação, **exceto o guia**, que só gera aviso. O serviço de presença tem workflow próprio, [`presenca.yml`](.github/workflows/presenca.yml) (roda só quando `workers/presenca/**` muda): testes do Worker e `wrangler deploy`; é independente do site.
 
 > O GitHub desativa workflows agendados após 60 dias sem atividade no repositório; basta um push ou execução manual para reativar.
 
@@ -298,6 +408,7 @@ shared/           tipos e utilitários usados pelo pipeline e pelo site
 src/brand/        geometria única da marca (moldura aberta + luz de transmissão)
 src/styles/       tokens (claro/escuro), base e componentes
 src/components/   Player, HlsStage, grade (ChannelList), folhas, navegação inferior, páginas Sobre e Instalar
+workers/presenca/ serviço "assistindo agora" (Cloudflare Worker + Durable Object), testes, custos.mjs e carga.mjs; tem `package.json` próprio (Node 22)
 src/lib/remote/   controle pelo celular: cifra (AES-GCM, código, anti-repetição), protocolo validado, receptor (computador), controlador (celular) e transportes (MQTT, BroadcastChannel)
 src/lib/          filtros, grade/zapear, atalhos, preferências, contador, PWA, rotas por hash, armazenamento seguro, Cast (cast.ts, castSdk.ts, useCast.ts), AirPlay (transporte.ts), modos e timer (modo.ts, timer.ts)
 tests/unit/       testes unitários (Vitest) com playlists reais e malformadas em tests/fixtures/
@@ -310,7 +421,7 @@ Rotas usam *hash* (`#/` tela inicial, `#/canais` player + grade, `#/canal/BR/<id
 build ainda copia `index.html` para `404.html`. Os atalhos do manifesto usam `#/zapear`, `#/favoritos` e `#/buscar`.
 
 `localStorage` (todas as leituras e escritas com `try/catch`): `tvlivre:favoritos`, `tvlivre:recentes`, `tvlivre:pais`,
-`tvlivre:ultimo`, `tvlivre:tema`, `tvlivre:mudo`, `tvlivre:instalar-dispensado`, `tvlivre:dica-deslizar`, `tvlivre:http-liberado`, `tvlivre:modo-tv`, `tvlivre:modo-audio` (`normal` | `economico` | `radio`), `tvlivre:timer-padrao` (`15` | `30` | `60` | `90` | `fim`), `tvlivre:dica-dados` e `tvlivre:transmitindo`; em `sessionStorage` (só enquanto a aba existe): `tvlivre:controle-sessao` (computador) e `tvlivre:controle-par` (celular); `tvlivre:remote-broker` só para desenvolvimento (só existe durante uma transmissão que o usuário começou).
+`tvlivre:ultimo`, `tvlivre:tema`, `tvlivre:mudo`, `tvlivre:instalar-dispensado`, `tvlivre:dica-deslizar`, `tvlivre:http-liberado`, `tvlivre:modo-tv`, `tvlivre:modo-audio` (`normal` | `economico` | `radio`), `tvlivre:timer-padrao` (`15` | `30` | `60` | `90` | `fim`), `tvlivre:dica-dados` e `tvlivre:transmitindo`; em `sessionStorage` (só enquanto a aba existe): `tvlivre:controle-sessao` (computador), `tvlivre:controle-par` (celular) e `tvlivre:presenca-aba` (id aleatório da aba, nunca enviado); `tvlivre:presenca-teste` (em `localStorage`) só para desenvolvimento e testes; `tvlivre:remote-broker` só para desenvolvimento (só existe durante uma transmissão que o usuário começou).
 
 ## Créditos e licenças
 
