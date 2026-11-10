@@ -36,6 +36,9 @@ const novoAnexo = (agora: number): Anexo => ({ e: 'n', x: agora, u: agora, f: CO
  */
 export class Sala extends DurableObject<Env> {
   private contadores: Contadores = novosContadores(Date.now());
+  /** há contadores novos ainda não gravados (a gravação é em lote, no alarme) */
+  private sujo = false;
+  private ultimaGravacao = 0;
   private porIp = new ContadorPorIp();
   private ipDe = new WeakMap<WebSocket, string>();
   private acessosPorIp = new LimitadorJanela(CONFIG.MAX_ACESSOS_POR_IP_HORA, 3_600_000);
@@ -77,7 +80,7 @@ export class Sala extends DurableObject<Env> {
     if (!this.acessosPorIp.permitir(ip, Date.now())) return Response.json(this.totais(), { status: 429 });
     await this.migrarDoAbacus();
     aplicarAcesso(this.contadores, Date.now());
-    await this.ctx.storage.put('contadores', this.contadores); // 1 linha escrita por acesso
+    this.sujo = true; // gravado em lote pelo alarme (no máximo a cada 15 s), não a cada visita
     void this.agendar();
     return Response.json(this.totais());
   }
@@ -91,6 +94,7 @@ export class Sala extends DurableObject<Env> {
       if (r.ok && typeof v === 'number' && Number.isSafeInteger(v) && v >= 0) {
         this.contadores.total += v;
         this.contadores.migrado = true;
+        await this.gravar(); // a migração só pode acontecer UMA vez: grava na hora
       }
     } catch {
       /* sem Abacus agora: tenta de novo no próximo acesso */
@@ -144,14 +148,22 @@ export class Sala extends DurableObject<Env> {
     if (atual === null || atual > alvo) await this.ctx.storage.setAlarm(alvo);
   }
 
+  /** Grava os contadores (1 linha). */
+  private async gravar(): Promise<void> {
+    await this.ctx.storage.put('contadores', this.contadores);
+    this.sujo = false;
+    this.ultimaGravacao = Date.now();
+  }
+
   async alarm(): Promise<void> {
     const agora = Date.now();
     this.varrerMortas(agora);
     const conexoes = this.ctx.getWebSockets();
-    if (virarDia(this.contadores, agora)) await this.ctx.storage.put('contadores', this.contadores);
+    if (virarDia(this.contadores, agora)) this.sujo = true;
     const anexos = conexoes.map((w) => w.deserializeAttachment() as Anexo | null).filter((a): a is Anexo => !!a);
     const r = resumir(anexos);
-    if (atualizarPico(this.contadores, r.assistindo, agora)) await this.ctx.storage.put('contadores', this.contadores);
+    if (atualizarPico(this.contadores, r.assistindo, agora)) this.sujo = true;
+    let enviou = false;
     for (const ws of conexoes) {
       const a = ws.deserializeAttachment() as Anexo | null;
       if (!a) continue;
@@ -164,12 +176,17 @@ export class Sala extends DurableObject<Env> {
       this.ultimaEnviada.set(ws, texto);
       try {
         ws.send(texto);
+        enviou = true;
       } catch {
         /* conexão já caiu: a varredura cuida */
       }
     }
-    // enquanto houver conexões, volta em 60 s só para varrer as mortas
-    if (conexoes.length > 0) await this.ctx.storage.setAlarm(agora + CONFIG.VARREDURA_MS);
+    if (this.sujo && agora - this.ultimaGravacao >= CONFIG.GRAVAR_A_CADA_MS) await this.gravar();
+    // próximo alarme: se houve mudança, em 3 s (a atividade costuma continuar); com contadores por gravar, em 15 s; senão
+    // só a varredura, em 60 s (e nenhum alarme se não há conexões nem o que gravar)
+    if (enviou) await this.ctx.storage.setAlarm(agora + CONFIG.DIFUSAO_MS);
+    else if (this.sujo) await this.ctx.storage.setAlarm(agora + CONFIG.GRAVAR_A_CADA_MS);
+    else if (conexoes.length > 0) await this.ctx.storage.setAlarm(agora + CONFIG.VARREDURA_MS);
   }
 
   /** Fecha quem não dá sinal (nem mensagem nem ping automático) há mais de 150 s. */

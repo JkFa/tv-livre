@@ -222,6 +222,28 @@ describe('acessos, recordes e migração', () => {
     expect(r2.acessos).toBe(502); // 1 + 500 do Abacus + 1
   });
 
+  it('os contadores vão ao armazenamento em lote (no máximo a cada 15 s), não a cada visita', async () => {
+    abacus(0);
+    const gravacoes: unknown[] = [];
+    const t0 = Date.now();
+    const spy = vi.spyOn(Date, 'now').mockReturnValue(t0);
+    await runInDurableObject(stub(), async (_i: Sala, state) => {
+      const original = state.storage.put.bind(state.storage) as (k: string, v: unknown) => Promise<void>;
+      (state.storage as unknown as { put: unknown }).put = (k: string, v: unknown) => (k === 'contadores' && gravacoes.push(structuredClone(v)), original(k, v));
+    });
+    for (let i = 0; i < 10; i++) await post(`10.2.0.${i}`);
+    expect(gravacoes).toHaveLength(1); // só a gravação da migração do Abacus (feita na hora, uma vez)
+    await runDurableObjectAlarm(stub());
+    expect(gravacoes).toHaveLength(1); // ainda dentro dos 15 s: nada novo
+    spy.mockReturnValue(t0 + 16_000);
+    await runDurableObjectAlarm(stub());
+    expect(gravacoes).toHaveLength(2); // passou de 15 s: grava o lote de uma vez
+    expect(gravacoes.at(-1)).toMatchObject({ total: 10, hoje: 10, migrado: true });
+    await runDurableObjectAlarm(stub());
+    expect(gravacoes).toHaveLength(2); // sem mudanças: nenhuma gravação
+    spy.mockRestore();
+  });
+
   it('recusa Origin inválida e limita acessos por IP/hora', async () => {
     abacus(0);
     expect((await post('10.1.1.6', 'https://evil.example')).status).toBe(403);

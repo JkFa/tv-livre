@@ -2,6 +2,8 @@
 export const CONFIG = {
   /** Difusão do resumo: no máximo uma a cada 3 s (agrupa mudanças) e só se algo mudou. */
   DIFUSAO_MS: 3_000,
+  /** Contadores (acessos, recorde) vão ao armazenamento em lote, no máximo a cada 15 s: 1 linha por gravação, e o plano gratuito dá 100 mil/dia. */
+  GRAVAR_A_CADA_MS: 15_000,
   /** Varredura de conexões mortas (e sinal de vida do alarme enquanto houver conexões). */
   VARREDURA_MS: 60_000,
   /** O cliente envia "ping" a cada 60 s (ver custos.mjs: com 30 s, 1.000 simultâneos estouram o plano gratuito). */
