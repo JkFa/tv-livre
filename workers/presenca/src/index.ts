@@ -35,7 +35,13 @@ export default {
       return new Response(r.body, { status: r.status, headers: cors(origin, { 'content-type': 'application/json', 'cache-control': 'no-store' }) });
     }
     if (url.pathname === '/resumo' && request.method === 'GET') {
-      // cache curto de borda: leituras repetidas não acordam o Durable Object
+      const liberada = origemPermitida(origin, env.AMBIENTE, env.ORIGENS) ? origin : null;
+      // em dev (testes) não há cache: o número lido é sempre o de agora
+      if (env.AMBIENTE === 'dev') {
+        const dentro = await sala.fetch(request);
+        return new Response(dentro.body, { status: dentro.status, headers: cors(liberada, { 'content-type': 'application/json', 'cache-control': 'public, max-age=10' }) });
+      }
+      // produção: cache curto de borda (10 s) — leituras repetidas não acordam o Durable Object
       const chave = new Request(`${url.origin}/resumo`);
       const cache = (caches as unknown as { default: Cache }).default;
       let r = await cache.match(chave);
@@ -44,7 +50,7 @@ export default {
         r = new Response(dentro.body, { status: dentro.status, headers: { 'content-type': 'application/json', 'cache-control': 'public, max-age=10' } });
         if (r.ok) await cache.put(chave, r.clone());
       }
-      return new Response(r.body, { status: r.status, headers: cors(origemPermitida(origin, env.AMBIENTE, env.ORIGENS) ? origin : null, r.headers) });
+      return new Response(r.body, { status: r.status, headers: cors(liberada, r.headers) });
     }
     return new Response('TV Livre presença: só conta conexões.', { status: 404 });
   },
