@@ -791,7 +791,7 @@ export default function App() {
               )}
             </div>
 
-            {tv && <EmAltaTv presenca={presenca} emAlta={emAlta} numeros={(c) => formatNumber(numbers.get(channelKey(c)))} onSelect={(c) => { tune(c); closeGuide(); }} />}
+            {tv && <EmAltaTv presenca={presenca} emAlta={emAlta.slice(0, 3)} numeros={(c) => formatNumber(numbers.get(channelKey(c)))} onSelect={(c) => { tune(c); closeGuide(); }} />}
             <ChannelList
               channels={visible}
               numbers={numbers}
