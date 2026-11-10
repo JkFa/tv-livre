@@ -1,0 +1,75 @@
+name: Publicar serviço de presença
+
+# Serviço "assistindo agora" (Cloudflare Worker em workers/presenca). Roda SÓ quando esse código muda (ou manualmente).
+# É independente do deploy do site: se falhar, o site continua sendo publicado normalmente (sem os números de presença).
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'workers/presenca/**'
+      - '.github/workflows/presenca.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: presenca
+  cancel-in-progress: false
+
+jobs:
+  testar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: workers/presenca
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: workers/presenca/package-lock.json
+
+      - run: npm ci --no-audit --no-fund
+
+      - name: Tipos
+        run: npm run typecheck
+
+      - name: Testes do Worker (runtime real da Cloudflare, local)
+        run: npm test
+
+  publicar:
+    needs: testar
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: workers/presenca
+    # os dois segredos vêm de Settings > Secrets and variables > Actions (ver README: "Publicar o serviço de presença")
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Sem credenciais da Cloudflare
+        if: env.CLOUDFLARE_API_TOKEN == '' || env.CLOUDFLARE_ACCOUNT_ID == ''
+        run: |
+          echo "::notice::CLOUDFLARE_API_TOKEN e CLOUDFLARE_ACCOUNT_ID não estão configurados: nada foi publicado (o site segue sem os números de presença)."
+
+      - uses: actions/checkout@v7
+        if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
+
+      - uses: actions/setup-node@v7
+        if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: workers/presenca/package-lock.json
+
+      - name: Publicar o Worker
+        if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
+        run: |
+          npm ci --no-audit --no-fund
+          npx wrangler deploy

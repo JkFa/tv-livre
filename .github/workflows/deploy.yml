@@ -58,8 +58,12 @@ jobs:
           (cd "$RUNNER_TEMP/epg" && HUSKY=0 npm ci --no-audit --no-fund)
           npm run epg -- --epg-dir "$RUNNER_TEMP/epg"
 
+      # VITE_PRESENCA_URL = endereço do serviço "assistindo agora" (variável do repositório PRESENCA_URL, não é segredo).
+      # Sem ela o site é construído como antes: contador do Abacus e nenhuma conexão de presença.
       - name: Build
         run: npm run build
+        env:
+          VITE_PRESENCA_URL: ${{ vars.PRESENCA_URL }}
 
       # Páginas estáticas indexáveis (um HTML por canal elegível, categorias, países, prévias OG e sitemap).
       # As prévias são renderizadas com o Chromium do Playwright.
@@ -68,6 +72,10 @@ jobs:
 
       - name: Páginas indexáveis e sitemap
         run: npm run build:pages
+
+      # O E2E da presença sobe o Worker de verdade (wrangler dev, local): precisa das dependências de workers/presenca.
+      - name: Dependências do serviço de presença (para o E2E)
+        run: npm ci --prefix workers/presenca --no-audit --no-fund
 
       - name: 'Testes de ponta a ponta (Playwright em Chromium e WebKit; Android, iPhone e desktop emulados)'
         run: npm run test:e2e

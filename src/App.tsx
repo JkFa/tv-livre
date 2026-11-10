@@ -9,7 +9,7 @@ import { Home } from './components/Home.tsx';
 import { ALL_COUNTRIES, FilterSheet, activeFilterCount } from './components/FilterSheet.tsx';
 import { InstallPage } from './components/InstallPage.tsx';
 import { Mark, Wordmark } from './components/Mark.tsx';
-import { VisitChip } from './components/Visits.tsx';
+import { AnuncioAssistindo, EmAltaTv, VisitChip } from './components/Visits.tsx';
 import { MoreSheet } from './components/MoreSheet.tsx';
 import { OfflineBar, Toast, UpdateBar } from './components/Notices.tsx';
 import { Player, type Neighbor } from './components/Player.tsx';
@@ -18,6 +18,8 @@ import { ShortcutsDialog } from './components/ShortcutsDialog.tsx';
 import { SmartTvSheet } from './components/SmartTvSheet.tsx';
 import { avisoPulo, podeTransmitir, proximoTransmissivel } from './lib/cast.ts';
 import { readTotal, registerVisit, shouldCount } from './lib/counter.ts';
+import { definirAssistindo, iniciarPresenca, usePresenca } from './lib/presenca-browser.ts';
+import { emAlta as calcularEmAlta, mapaMaisAssistidos } from './lib/presenca-ui.ts';
 import { loadCountries, loadCountry, loadIndex } from './lib/data.ts';
 import { agora, comecandoAgora, nowSec, useEpgCountries, useEpgVersion, useGuideClock } from './lib/epg.ts';
 import { compareForDisplay, EMPTY_FILTERS, filterChannels, suggestAlternatives, type Filters } from './lib/filter.ts';
@@ -64,6 +66,7 @@ export default function App() {
   const [theme, setThemeState] = useState<ThemePref>(() => getTheme());
   const [toast, setToast] = useState<string | null>(null);
   const [visits, setVisits] = useState<number | null>(null);
+  const presenca = usePresenca();
   const [region, setRegion] = useState<Region | null>(null);
   const [updateDismissed, setUpdateDismissed] = useState(false);
   const [tvPref, setTvPrefState] = useState<TvPref>(() => getTvPref());
@@ -109,6 +112,7 @@ export default function App() {
     // visita real: conta uma vez por sessão; ambiente local, testes e automação só leem o total
     void (shouldCount() ? registerVisit() : readTotal()).then(setVisits);
     void fetchRegion().then(setRegion);
+    iniciarPresenca(); // "assistindo agora": só liga com o serviço configurado, no site publicado, depois de carregar + interagir (ou 3 s)
   }, []);
 
   const effectiveCountry = useMemo(() => {
@@ -126,6 +130,9 @@ export default function App() {
     return index.countries.some((c) => c.code === 'BR') ? 'BR' : (index.countries[0]?.code ?? 'BR');
   }, [index, effectiveCountry]);
 
+  // países dos canais "em alta agora" (a vitrine precisa deles carregados para achar o canal)
+  const paisesEmAlta = presenca?.top.slice(0, 5).map((t) => t.p).join(',') ?? '';
+
   // quais arquivos de país são necessários agora
   const needed = useMemo(() => {
     if (!index) return [] as string[];
@@ -134,6 +141,7 @@ export default function App() {
       set.add(homeCountry);
       recents.slice(0, 6).forEach((r) => set.add(r.country));
       favorites.slice(0, 6).forEach((r) => set.add(r.country));
+      paisesEmAlta.split(',').filter(Boolean).forEach((c) => set.add(c));
     } else if (view === 'todos') {
       if (effectiveCountry === ALL_COUNTRIES) index.countries.forEach((c) => set.add(c.code));
       else set.add(effectiveCountry);
@@ -144,7 +152,7 @@ export default function App() {
     if (routeCountry) set.add(routeCountry);
     if (last) set.add(last.country);
     return [...set];
-  }, [index, isHome, homeCountry, view, effectiveCountry, favorites, recents, routeCountry, last]);
+  }, [index, isHome, homeCountry, view, effectiveCountry, favorites, recents, routeCountry, last, paisesEmAlta]);
 
   useEpgCountries(needed, index?.epg);
   const epgVersion = useEpgVersion();
@@ -188,14 +196,17 @@ export default function App() {
     return out;
   }, [view, effectiveCountry, store, favorites, recents]);
 
+  const maisAssistidos = useMemo(() => mapaMaisAssistidos(presenca), [presenca]);
+  // sem serviço de presença, "Mais assistidos agora" não existe: se estava marcado, deixa de valer
+  const filtros = presenca || !filters.trending ? filters : { ...filters, trending: false };
   const visible = useMemo(
     () => {
       const t = nowSec();
-      return filterChannels(baseList, { ...filters, query: deferredQuery }, { startingNow: (c) => !!comecandoAgora(c, t) });
+      return filterChannels(baseList, { ...filtros, query: deferredQuery }, { startingNow: (c) => !!comecandoAgora(c, t), assistindo: maisAssistidos });
     },
     // epgVersion e guideTick: o filtro "Começando agora" depende do guia carregado e do relógio
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [baseList, filters, deferredQuery, epgVersion, guideTick],
+    [baseList, filtros, deferredQuery, epgVersion, guideTick, maisAssistidos],
   );
 
   const selected = useMemo(
@@ -203,6 +214,13 @@ export default function App() {
     [route, store],
   );
   const selectedKey = selected ? channelKey(selected) : null;
+
+  // "assistindo agora": só conta com um canal na tela E o vídeo realmente tocando (pausa, erro e sair do player = navegando)
+  const assistindoId = route.name === 'channel' && selected && playing ? selected.id : null;
+  const assistindoPais = selected?.country ?? '';
+  useEffect(() => {
+    definirAssistindo(assistindoId ? { c: assistindoId, p: assistindoPais } : null);
+  }, [assistindoId, assistindoPais]);
   const selectedLoading = route.name === 'channel' && !selected && !(route.country in store);
   const selectedMissing = route.name === 'channel' && !selected && route.country in store;
 
@@ -465,6 +483,7 @@ export default function App() {
     const c = cast.conectado ? proximoTransmissivel(zapList, selectedKey, dir).canal : stepChannel(zapList, selectedKey, dir);
     return c ? { number: formatNumber(numbers.get(channelKey(c))), name: c.name } : null;
   };
+  const emAlta = useMemo(() => calcularEmAlta(presenca, store), [presenca, store]);
   const suggestions = useMemo(() => (selected ? suggestAlternatives(selected, store[selected.country] ?? []) : []), [selected, store]);
 
   const loading = !!missingKey && baseList.length === 0;
@@ -512,6 +531,7 @@ export default function App() {
   if (filters.status) chips.push({ label: STATUS_LABELS[filters.status], clear: () => setFilters({ ...filters, status: '' }) });
   if (filters.startingNow) chips.push({ label: 'Começando agora', clear: () => setFilters({ ...filters, startingNow: false }) });
   if (filters.listen) chips.push({ label: 'Bom para ouvir', clear: () => setFilters({ ...filters, listen: false }) });
+  if (filtros.trending) chips.push({ label: 'Mais assistidos agora', clear: () => setFilters({ ...filters, trending: false }) });
   if (filters.playableOnly) chips.push({ label: 'Só no navegador', clear: () => setFilters({ ...filters, playableOnly: false }) });
 
   const empty = (
@@ -569,7 +589,8 @@ export default function App() {
           <a href="#/sobre" aria-current={route.name === 'about' ? 'page' : undefined}>Sobre</a>
         </nav>
         <div className="top-actions">
-          <VisitChip total={visits} region={region} />
+          <AnuncioAssistindo presenca={presenca} />
+          <VisitChip total={visits} region={region} presenca={presenca} />
           {showInstallBtn && (
             <button type="button" className="btn btn-sm btn-outline" onClick={() => void install.prompt()}>
               <Download size={16} aria-hidden="true" /> Instalar
@@ -630,6 +651,8 @@ export default function App() {
             favorites={homeFavorites}
             digits={digits}
             visits={visits}
+            presenca={presenca}
+            emAlta={emAlta}
             region={region}
             tv={tv}
             onTune={tune}
@@ -683,6 +706,7 @@ export default function App() {
                 suggestions={suggestions}
                 onPick={tune}
                 onPlayingChange={setPlaying}
+                assistindoCanal={presenca?.meu ?? null}
                 digits={digits}
                 onShare={startShare}
                 cast={cast}
@@ -767,6 +791,7 @@ export default function App() {
               )}
             </div>
 
+            {tv && <EmAltaTv presenca={presenca} emAlta={emAlta.slice(0, 3)} numeros={(c) => formatNumber(numbers.get(channelKey(c)))} onSelect={(c) => { tune(c); closeGuide(); }} />}
             <ChannelList
               channels={visible}
               numbers={numbers}
@@ -833,6 +858,7 @@ export default function App() {
           filters={filters}
           onFilters={setFilters}
           resultCount={visible.length}
+          presencaOn={!!presenca}
         />
       )}
       <SmartTvSheet open={sheet === 'tv'} onClose={() => closeSheet('tv')} numero={selected ? formatNumber(numbers.get(channelKey(selected))) : null} />

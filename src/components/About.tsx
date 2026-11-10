@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
 import { COUNTER_BASE, COUNTER_NS, readTotal } from '../lib/counter.ts';
+import { usePresenca } from '../lib/presenca-browser.ts';
+import { dataExtenso, fmtNum } from '../lib/presenca-ui.ts';
+import { presencaBase } from '../lib/presenca-url.ts';
 
 const nf = new Intl.NumberFormat('pt-BR');
 
@@ -23,7 +26,25 @@ function VisitCounter({ initial }: { initial: number | null }) {
   );
 }
 
+/** Recordes do serviço de presença (só aparecem quando ele responde). */
+function Recordes() {
+  const r = usePresenca();
+  if (!r) return null;
+  return (
+    <section className="records" aria-label="Recordes" data-testid="recordes">
+      <p><span className="num">{fmtNum(r.assistindo)}</span> assistindo agora</p>
+      <p><span className="num">{fmtNum(r.hoje)}</span> acessos hoje</p>
+      {r.pico > 0 && (
+        <p>
+          <span className="num">{fmtNum(r.pico)}</span> recorde de pessoas assistindo ao mesmo tempo{r.picoEm ? `, em ${dataExtenso(r.picoEm)}` : ''}
+        </p>
+      )}
+    </section>
+  );
+}
+
 export function About({ visits }: { visits: number | null }) {
+  const comPresenca = presencaBase() !== null;
   return (
     <article className="doc">
       <h1>Sobre o TV Livre</h1>
@@ -33,6 +54,7 @@ export function About({ visits }: { visits: number | null }) {
       </p>
 
       <VisitCounter initial={visits} />
+      <Recordes />
 
       <h2>Não hospedamos vídeo</h2>
       <p>
@@ -83,12 +105,25 @@ export function About({ visits }: { visits: number | null }) {
       <ul>
         <li>Favoritos, últimos assistidos, tema e país ficam só no armazenamento local do seu aparelho. Nada disso é enviado a ninguém.</li>
         <li>Na grade não carregamos logos de terceiros; o logo só é baixado do servidor de origem quando você abre o canal.</li>
-        <li>
-          O contador de acessos usa o serviço gratuito{' '}
-          <a href={COUNTER_BASE} target="_blank" rel="noopener noreferrer">Abacus</a>. Conta no máximo uma visita por sessão,
-          sem cookies e sem dados pessoais: o serviço recebe apenas o nome do contador (<code>{COUNTER_NS}</code>). O número
-          mostrado é o valor devolvido pelo serviço; se ele estiver fora do ar, o contador some.
-        </li>
+        {comPresenca ? (
+          <li>
+            <strong>Acessos e “assistindo agora”:</strong> um serviço próprio e gratuito (um Cloudflare Worker) conta quantas pessoas estão com o
+            TV Livre aberto e quantas estão com um canal tocando. O seu navegador envia só <b>dois fatos</b>: se há um canal tocando e <b>qual
+            canal</b> (o identificador dele, como <code>BR/globo</code>). <b>Não recebemos</b> nome, conta, cookie, identificador do aparelho
+            nem o seu endereço de IP guardado: o endereço só é visto no instante da conexão, para limitar abusos (no máximo 10 conexões por
+            endereço), e fica apenas na memória, nunca é gravado. O número de cada canal só aparece com <b>3 ou mais pessoas</b>. Se você abrir
+            o site em várias abas do mesmo navegador, conta uma conexão só. Os números são uma <b>estimativa</b> de conexões abertas, não uma
+            medida exata. A visita ao site é contada uma vez por sessão. Se o serviço estiver fora do ar, os números simplesmente somem e o
+            vídeo continua normalmente.
+          </li>
+        ) : (
+          <li>
+            O contador de acessos usa o serviço gratuito{' '}
+            <a href={COUNTER_BASE} target="_blank" rel="noopener noreferrer">Abacus</a>. Conta no máximo uma visita por sessão,
+            sem cookies e sem dados pessoais: o serviço recebe apenas o nome do contador (<code>{COUNTER_NS}</code>). O número
+            mostrado é o valor devolvido pelo serviço; se ele estiver fora do ar, o contador some.
+          </li>
+        )}
         <li>
           Para mostrar <strong>de onde você está acessando</strong> (estado e país), o seu navegador pergunta ao serviço{' '}
           <a href="https://ipwho.is" target="_blank" rel="noopener noreferrer">ipwho.is</a>, que enxerga o seu endereço de

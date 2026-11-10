@@ -82,6 +82,7 @@ Estados desenhados para tudo: foco (anel de 2 px no acento com 2 px de recuo, 3:
 - Só `transform` e `opacity`. Nada anima `width`, `height`, `top` ou `box-shadow`.
 - Nada anima na carga da página. Movimento só responde a uma ação (trocar de canal, abrir folha, mostrar aviso).
 - `prefers-reduced-motion: reduce`: deslocamentos são removidos; ficam apenas fades de 1 ms (efetivamente instantâneos).
+- **Única exceção a "nada anima na carga":** o ponto vermelho do "assistindo agora" (`.live-dot`) pulsa devagar (2,4 s, **só `opacity`**, 1 → 0,35) para sinalizar que o número é vivo, como a luz de transmissão da marca. Com `prefers-reduced-motion` fica parado. Os números trocam com um fade de 240 ms (também só opacidade) e usam `tabular-nums` para não "dançar".
 
 ## Mobile primeiro
 
@@ -125,6 +126,14 @@ Na TV: sem barras, foco inicial em "Ligar a TV", setas movem o foco, tipografia 
 - **Foco:** anel de 5 px no acento, com recuo de 3 px (invertido para claro sobre o vídeo). O foco é o cursor; o mouse some.
 - **Teclas coloridas** têm legenda no rodapé da grade; a cor só marca a tecla, o texto diz a ação.
 - **Regra de ouro:** ▲▼ nunca ficam sem efeito. Assistindo, trocam de canal; na grade, movem o foco; num painel de erro, movem entre os botões.
+
+## Assistindo agora
+
+- `● 37 assistindo agora · 12.408 acessos` no topo do computador (`.visit-chip`) e, grande, na tela inicial (`.visits-live`, Archivo, acento). O ponto é o **único** vermelho a mais; nada de novas cores.
+- **"N assistindo este canal"** (`.watching`) abaixo do seletor de canais, só com 3 ou mais. **"Em alta agora"** na tela inicial reaproveita o `Tile` com a linha `● N assistindo`.
+- Modo TV: só o total na faixa e o "Em alta" no alto da grade (`.tv-emalta`), tudo botão (foco espacial como o resto). Tamanhos de sala: total 44 px, nomes 27 px, linhas de 64 px.
+- A única região `aria-live` é o total (`AnuncioAssistindo`, no máximo um anúncio a cada 30 s); os números visíveis não são regiões vivas.
+- Sem o serviço, **nada disso aparece** (nem espaço reservado): a tela fica como antes.
 
 ## Guia, páginas de canal e compartilhar
 

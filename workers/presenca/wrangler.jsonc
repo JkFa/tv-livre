@@ -1,0 +1,18 @@
+{
+  // Serviço de presença do TV Livre: só conta conexões. Não recebe vídeo, IP gravado nem identificador persistente.
+  "name": "tvlivre-presenca",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "durable_objects": { "bindings": [{ "name": "SALA", "class_name": "Sala" }] },
+  // Plano gratuito: só Durable Objects com armazenamento SQLite.
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Sala"] }],
+  "vars": {
+    // origens que podem abrir a conexão (separadas por vírgula)
+    "ORIGENS": "https://jkfa.github.io",
+    // "producao" ou "dev" (dev também aceita http://localhost e http://127.0.0.1, para testes locais)
+    "AMBIENTE": "producao",
+    // valor atual do contador antigo (Abacus), usado UMA vez para o total não cair na migração
+    "ABACUS_URL": "https://abacus.jasoncameron.dev/get/tvlivre-jkfa/acessos"
+  },
+  "observability": { "enabled": false }
+}

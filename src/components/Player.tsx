@@ -3,6 +3,7 @@ import {
   Airplay, Cast, ChevronLeft, ChevronRight, Download, ExternalLink, Maximize, Minimize, Pause, PictureInPicture2, Play, Power,
   RotateCw, ScreenShare, Share2, ShieldCheck, Star, Volume2, VolumeX, WifiOff,
 } from 'lucide-react';
+import { MIN_PUBLICO, textoCanal } from '../lib/presenca-ui.ts';
 import type { Channel } from '../../shared/types.ts';
 import { youtubeEmbedUrl } from '../../shared/youtube.ts';
 import { castMedia, podeTransmitir } from '../lib/cast.ts';
@@ -70,6 +71,8 @@ interface Props {
   /** Normal, Econômico ou Rádio (preferência `tvlivre:modo-audio`). */
   modo: ModoAudio;
   onModo: (m: ModoAudio) => void;
+  /** Quantas pessoas assistem ESTE canal agora (o serviço só informa com 3 ou mais; null = não mostrar). */
+  assistindoCanal?: number | null;
 }
 
 /** Soma dos bytes reais dos trechos baixados nesta sessão (vale para todos os canais até recarregar a página). */
@@ -677,6 +680,12 @@ export function Player(props: Props) {
       </div>
 
       <Dial {...props} channel={channel} onToggleFavorite={props.onToggleFavorite} />
+      {props.assistindoCanal != null && props.assistindoCanal >= MIN_PUBLICO && (
+        <p className="watching" data-testid="assistindo-canal">
+          <span className="live-dot" aria-hidden="true" />
+          {textoCanal(props.assistindoCanal)}
+        </p>
+      )}
       {!isTvNow() && <GuideStrip channel={channel} />}
       {dica && props.modo === 'normal' && (
         <DataTip onEscolher={(m) => { setDica(false); props.onModo(m); }} onDispensar={() => setDica(false)} />
