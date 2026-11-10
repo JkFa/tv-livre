@@ -105,3 +105,44 @@ describe('contador de acessos (Abacus)', () => {
     expect(shouldCount({ hostname: 'jkfa.github.io' }, false)).toBe(false);
   });
 });
+
+describe('contador com o serviço de presença', () => {
+  const doServico = (acessos: number) => vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(async () => new Response(JSON.stringify({ acessos, hoje: 3 }), { status: 200 }));
+
+  beforeEach(() => {
+    vi.stubEnv('VITE_PRESENCA_URL', 'https://p.workers.dev');
+  });
+
+  it('registra a visita com POST /acesso (uma por sessão) e NÃO chama o Abacus', async () => {
+    const f = doServico(12_345);
+    expect(await registerVisit(true, f as unknown as typeof fetch)).toBe(12_345);
+    expect(await registerVisit(true, f as unknown as typeof fetch)).toBe(12_345);
+    expect(f).toHaveBeenCalledTimes(1);
+    const [url, init] = f.mock.calls[0]!;
+    expect(String(url)).toBe('https://p.workers.dev/acesso');
+    expect(init).toMatchObject({ method: 'POST', credentials: 'omit', referrerPolicy: 'no-referrer' });
+    expect(init?.headers).toBeUndefined();
+  });
+
+  it('se o serviço falhar, a visita não vai para o Abacus (evita contar duas vezes)', async () => {
+    const f = vi.fn<(url: string) => Promise<Response>>(async () => new Response('x', { status: 503 }));
+    expect(await registerVisit(true, f as unknown as typeof fetch)).toBeNull();
+    expect(f).toHaveBeenCalledTimes(1);
+    expect(String(f.mock.calls[0]?.[0])).toContain('p.workers.dev');
+  });
+
+  it('lê o total de /resumo e, se falhar, cai no Abacus (leitura)', async () => {
+    const f = doServico(900);
+    expect(await readTotal(f as unknown as typeof fetch)).toBe(900);
+    expect(String(f.mock.calls[0]?.[0])).toBe('https://p.workers.dev/resumo');
+    resetCounterForTests();
+    const g = vi.fn<(url: string) => Promise<Response>>(async (url) => (url.includes('p.workers.dev') ? new Response('x', { status: 500 }) : new Response(JSON.stringify({ value: 777 }), { status: 200 })));
+    expect(await readTotal(g as unknown as typeof fetch)).toBe(777);
+    expect(g).toHaveBeenCalledTimes(2);
+  });
+
+  it('resposta com formato inesperado é ignorada', async () => {
+    const f = vi.fn(async () => new Response(JSON.stringify({ acessos: '5' }), { status: 200 }));
+    expect(await registerVisit(true, f as unknown as typeof fetch)).toBeNull();
+  });
+});

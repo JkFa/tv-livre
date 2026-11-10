@@ -1,7 +1,12 @@
 /**
- * Contador de acessos via Abacus (https://abacus.jasoncameron.dev): serviço gratuito, sem chave, sem cookies,
- * CORS aberto. Só enviamos o namespace e a chave do contador — nenhum dado pessoal.
+ * Contador de acessos. Com o serviço de presença configurado (`VITE_PRESENCA_URL`), a visita é registrada nele
+ * (`POST /acesso`) e o total é lido de `/resumo`. Sem ele, ou se a leitura falhar, usa o Abacus
+ * (https://abacus.jasoncameron.dev): serviço gratuito, sem chave, sem cookies, CORS aberto.
+ * Só enviamos o namespace e a chave do contador — nenhum dado pessoal. Com o serviço de presença configurado, uma visita
+ * que falhar NÃO é repetida no Abacus (o serviço novo já partiu do total do Abacus: contar nos dois duplicaria).
  */
+import { presencaBase, presencaTeste } from './presenca-url.ts';
+
 export const COUNTER_BASE = 'https://abacus.jasoncameron.dev';
 export const COUNTER_NS = 'tvlivre-jkfa';
 export const COUNTER_KEY = 'acessos';
@@ -31,9 +36,28 @@ async function call(kind: 'hit' | 'get', fetchFn: typeof fetch): Promise<number 
   }
 }
 
-/** Conta só visitas reais: site publicado, sem automação e sem ambiente de desenvolvimento. */
+/** Conta só visitas reais: site publicado, sem automação e sem ambiente de desenvolvimento (ou o modo de teste explícito). */
 export function shouldCount(loc: Pick<Location, 'hostname'> = window.location, webdriver = navigator.webdriver): boolean {
+  if (presencaTeste() !== null) return true;
   return import.meta.env.PROD && loc.hostname === 'jkfa.github.io' && !webdriver;
+}
+
+/** Fala com o serviço de presença: `POST /acesso` (conta) ou `GET /resumo` (lê). Devolve o total ou null. */
+async function chamarPresenca(base: string, tipo: 'acesso' | 'resumo', fetchFn: typeof fetch): Promise<number | null> {
+  try {
+    const res = await fetchFn(`${base}/${tipo}`, {
+      method: tipo === 'acesso' ? 'POST' : 'GET',
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+      credentials: 'omit',
+      referrerPolicy: 'no-referrer',
+      cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    const v = ((await res.json()) as { acessos?: unknown } | null)?.acessos;
+    return typeof v === 'number' && Number.isSafeInteger(v) && v >= 0 ? v : null;
+  } catch {
+    return null;
+  }
 }
 
 function sessionGet(k: string): string | null {
@@ -61,7 +85,8 @@ export async function registerVisit(count: boolean = shouldCount(), fetchFn: typ
     return stored !== null && Number.isSafeInteger(n) && n > 0 ? n : lastTotal;
   }
   countedThisPage = true; // evita contagem dupla mesmo se o sessionStorage estiver bloqueado
-  const total = await call('hit', fetchFn);
+  const base = presencaBase();
+  const total = base ? await chamarPresenca(base, 'acesso', fetchFn) : await call('hit', fetchFn);
   if (total !== null) {
     lastTotal = total;
     sessionSet(SESSION_FLAG, String(total));
@@ -72,7 +97,8 @@ export async function registerVisit(count: boolean = shouldCount(), fetchFn: typ
 /** Lê o total sem incrementar (usado na página Sobre). */
 export async function readTotal(fetchFn: typeof fetch = fetch): Promise<number | null> {
   if (lastTotal !== null) return lastTotal;
-  const n = await call('get', fetchFn);
+  const base = presencaBase();
+  const n = (base ? await chamarPresenca(base, 'resumo', fetchFn) : null) ?? (await call('get', fetchFn));
   if (n !== null) lastTotal = n;
   return n;
 }
