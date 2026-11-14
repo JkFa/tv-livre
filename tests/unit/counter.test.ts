@@ -19,7 +19,8 @@ const okFetch = (value: number) =>
 
 beforeEach(() => {
   resetCounterForTests();
-  vi.stubGlobal('window', { sessionStorage: fakeSession() });
+  vi.stubGlobal('window', { sessionStorage: fakeSession(), location: { hostname: 'localhost' } });
+  vi.stubGlobal('navigator', { webdriver: false }); // o Node 20 não tem `navigator`
 });
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -133,12 +134,23 @@ describe('contador com o serviço de presença', () => {
 
   it('lê o total de /resumo e, se falhar, cai no Abacus (leitura)', async () => {
     const f = doServico(900);
-    expect(await readTotal(f as unknown as typeof fetch)).toBe(900);
+    expect(await readTotal(f as unknown as typeof fetch, true)).toBe(900);
     expect(String(f.mock.calls[0]?.[0])).toBe('https://p.workers.dev/resumo');
     resetCounterForTests();
     const g = vi.fn<(url: string) => Promise<Response>>(async (url) => (url.includes('p.workers.dev') ? new Response('x', { status: 500 }) : new Response(JSON.stringify({ value: 777 }), { status: 200 })));
-    expect(await readTotal(g as unknown as typeof fetch)).toBe(777);
+    expect(await readTotal(g as unknown as typeof fetch, true)).toBe(777);
     expect(g).toHaveBeenCalledTimes(2);
+  });
+
+  it('fora do site publicado (localhost, prévia, automação) a leitura NÃO consulta o serviço: vai direto ao Abacus', async () => {
+    const f = vi.fn<(url: string) => Promise<Response>>(async () => new Response(JSON.stringify({ value: 321 }), { status: 200 }));
+    expect(await readTotal(f as unknown as typeof fetch, false)).toBe(321);
+    expect(f).toHaveBeenCalledTimes(1);
+    expect(String(f.mock.calls[0]?.[0])).not.toContain('p.workers.dev');
+    resetCounterForTests();
+    // padrão: sem PROD + jkfa.github.io (ou o modo de teste), a presença não está ativa
+    expect(await readTotal(f as unknown as typeof fetch)).toBe(321);
+    expect(f.mock.calls.every(([u]) => !String(u).includes('p.workers.dev'))).toBe(true);
   });
 
   it('resposta com formato inesperado é ignorada', async () => {
