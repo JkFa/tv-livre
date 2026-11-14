@@ -186,6 +186,13 @@ test.describe('AirPlay (destino simulado)', () => {
       w.__picker = 0;
       HTMLVideoElement.prototype.canPlayType = () => 'maybe'; // o AirPlay só existe onde há HLS nativo
       (HTMLVideoElement.prototype as unknown as { webkitShowPlaybackTargetPicker: () => void }).webkitShowPlaybackTargetPicker = () => void w.__picker++;
+      // O HLS nativo é simulado: o WebKit/Chromium de teste não toca a lista por `src` e dispara um erro real ("formato não
+      // suportado") logo depois. Se ele chegasse depois do `playing` simulado, o app trataria como queda e reconectaria, e o
+      // seletor nunca abriria (corrida que derrubava este teste de vez em quando). Barramos esse erro antes do app.
+      document.addEventListener('error', (e) => {
+        const v = e.target;
+        if (v instanceof HTMLVideoElement && v.getAttribute('src')?.endsWith('.m3u8')) e.stopImmediatePropagation();
+      }, true);
     });
     await preparar(page);
     await tuneByLink(page, MULTI);
