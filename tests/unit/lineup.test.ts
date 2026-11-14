@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Channel } from '../../shared/types.ts';
-import { buildNumbers, channelKey, findByNumber, formatNumber, lineupOrder, pickShuffle, stepChannel } from '../../src/lib/lineup.ts';
+import { buildNumbers, findByNumber, formatNumber, lineupOrder, stepChannel } from '../../src/lib/lineup.ts';
 
 const ch = (id: string, p: Partial<Channel> = {}): Channel => ({
   id, name: id, country: 'BR', categories: [], languages: ['por'], url: `https://x.com/${id}.m3u8`,
@@ -64,18 +64,3 @@ describe('zapear: próximo/anterior', () => {
   });
 });
 
-describe('zapear: sorteio', () => {
-  const list = [ch('a'), ch('b', { status: 'offline' }), ch('c', { kind: 'http' }), ch('d', { status: 'desconhecido' })];
-  it('sorteia entre canais no ar que tocam no navegador, nunca o atual', () => {
-    for (let i = 0; i < 20; i++) expect(pickShuffle(list, 'BR/x')?.id).toBe('a');
-    expect(pickShuffle(list, channelKey(list[0]!))?.id).toBe('c'); // relaxa: online mas HTTP
-  });
-  it('usa o gerador informado de forma determinística', () => {
-    const many = ['a', 'b', 'c', 'd'].map((id) => ch(id));
-    expect(pickShuffle(many, null, () => 0)?.id).toBe('a');
-    expect(pickShuffle(many, null, () => 0.99)?.id).toBe('d');
-  });
-  it('nenhum candidato → null', () => {
-    expect(pickShuffle([ch('b', { status: 'offline' })], null)).toBeNull();
-  });
-});

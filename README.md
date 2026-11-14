@@ -13,6 +13,7 @@ aplicativo instalável. Sem cadastro, sem anúncios, sem cobrança, e **sem hosp
   HLS nativo do navegador onde o hls.js não existe (Safari do iPhone). YouTube usa o embed oficial.
 - O navegador acessa **diretamente** a fonte do vídeo: não há backend de vídeo, proxy, retransmissão nem gravação. Há só um **contador de presença** (Cloudflare Worker) para o "assistindo agora"; sem ele, o site funciona igual.
 - Interface em português do Brasil, mobile primeiro. **O padrão é o tema claro** (mesmo com o sistema no escuro); o ícone de lua/sol na barra do topo, **inclusive no celular**, alterna claro e escuro com um toque, e **Mais › Tema** também oferece "Automático" (segue o sistema). A escolha fica em `tvlivre:tema`.
+- **Guia de TV** (`#/guia`): os canais de um país **por assunto**, com país escolhido **por região** e a **origem** de cada canal (bandeira + país) em toda a interface.
 - **Guia de programação** ("Agora" e "A seguir"), **páginas indexáveis por canal** (Google e prévia bonita no WhatsApp) e botão **Compartilhar**.
 
 ### A marca: "o controle remoto reinventado"
@@ -27,8 +28,10 @@ Detalhes, tokens e regras de movimento em [DESIGN.md](DESIGN.md).
 
 | Recurso | Como funciona |
 |---|---|
-| Zapear | Dial `‹ 06 · 07 Nome · 08 ›`, deslizar no player (ignora as bordas da tela, que são do sistema), botão central **Zapear**. |
+| Zapear | Dial `‹ 06 · 07 Nome · 08 ›`, deslizar no player (ignora as bordas da tela, que são do sistema), botão **Zapear** no dial, no mini-player (o sorteado entra na própria janela), no Guia de TV e no centro da navegação. O sorteio é **um só** (`src/lib/zapear.ts`, hook `useZapear`) para todos esses botões, a tecla `Z`, o botão verde da TV e o controle pelo celular: só canais **no ar** que **tocam neste navegador**; se houver menos de 5, junta os **instáveis**; os que *não abriram aqui* só entram se não sobrar nada; não repete os últimos 10 sorteados enquanto houver alternativa; transmitindo para a TV, só o que o Chromecast abre. Sem dado de saúde (lista antiga), qualquer canal não-offline que toque aqui. |
 | Teclado (desktop) | `←` `→` `↑` `↓` trocam de canal · `Z` zapeia · `/` busca · `F` tela cheia · `M` mudo · `P` PiP · `Espaço` pausa · `S` compartilha · `R` alterna o Rádio · `C` abre "Controlar pelo celular" · `0–9`+`Enter` digitam o número · `?` lista os atalhos. |
+| Volume | Controle deslizante de 0 a 100 ao lado do botão de som, sempre visível com os controles (não depende de hover). O valor fica salvo (`tvlivre:volume`). O ícone e a tecla `M` silenciam e **devolvem o volume de antes**; arrastar até 0 é mudo. No teclado: `Tab` até o controle e setas (passo de 5), `Home`/`End`. No iPhone/iPad o navegador não deixa o site mudar o volume: fica só o botão de mudo. |
+| Mini-player | Sair do canal **com o vídeo tocando** (para o Início, Sobre, Instalar) não para a transmissão: o mesmo player vira uma janela fixa (canto inferior direito; no celular, uma faixa **acima** da navegação) com tocar/pausar, som, **expandir** e **fechar**. É um único `<Player>`/`<video>` que nunca é desmontado na troca de tela (não reinicia o stream e nunca há dois). Na grade (`#/canais`) ele continua no lugar de sempre. Pausado, com erro, no Modo TV ou transmitindo para a TV, sair do canal para como antes. Não é o PiP do navegador (que continua no botão e na tecla `P`). |
 | Mobile | Navegação inferior ao alcance do polegar, filtros em folha inferior, player fixo no topo, `playsinline`, paisagem com player e grade lado a lado e convite para tela cheia. |
 | Plataforma | Picture-in-Picture, Media Session (tela de bloqueio e teclas de mídia trocam de canal) e Wake Lock (tela ligada enquanto toca). |
 | Resiliência | Autoplay só após uma ação do usuário; se o navegador bloquear, a interface continua. Queda de rede ou volta do segundo plano retomam o canal (até 3 tentativas), pulando para o ao vivo. |
@@ -299,7 +302,8 @@ Em navegadores de TV (Samsung/Tizen, LG/webOS, Google TV, Fire TV, Chromecast) o
 | Duplicatas | Por URL (http/https tratados como iguais) e por *nome normalizado + país*. **Free-TV tem prioridade**; a origem de cada canal fica em `sources`. |
 | Adultos | Excluídos por `is_nsfw`, categoria `xxx`, blocklist do iptv-org, URLs de canais adultos e palavras-chave. |
 | Tipo do link | `hls` (HTTPS reproduzível), `youtube`, `http` (o site tenta HTTPS e, se o usuário liberou, HTTP puro) ou `other`. |
-| Status | `online`, `offline` ou `desconhecido` (no app: *No ar*, *Fora do ar*, *Não confirmado*). **Uma falha isolada nunca remove nem derruba um canal.** |
+| Status | `online`, `offline` ou `desconhecido`, mais `fails` (falhas seguidas). No app: *No ar*, *Instável* (1–2 falhas seguidas), *Fora do ar* e *Não confirmado* (`src/lib/health.ts`). **Uma falha isolada nunca remove nem derruba um canal.** |
+| Medidas | `checked` (último teste, minutos desde a época), `latency` (ms até a resposta, medido nos EUA: só uma dica), `resolution` (maior variante da lista HLS, ex. `1080p`) e `httpsOk` (link HTTP que também responde por HTTPS com CORS: toca no navegador sem conteúdo misto). Só aparecem quando há valor. |
 | Saída | `public/data/index.json` (leve) + `public/data/countries/<PAÍS>.json` + `health.json`. A página só baixa o índice e o país escolhido. |
 
 **Número do canal.** É a posição estável do canal na grade do país (Free-TV primeiro, depois ordem alfabética), independente de
@@ -308,7 +312,32 @@ filtros e de status; só muda quando a lista de canais muda.
 **Regras de status.** Sucesso → `online`. Falha certa (404/410, DNS, certificado) → `offline`, mas um canal que estava online
 só cai para `desconhecido` na primeira falha. Falha ambígua (timeout, 403, 5xx, conteúdo estranho, comum em bloqueio
 geográfico, já que o teste roda em servidores fora do Brasil) → `desconhecido`, e só vira `offline` após 3 execuções seguidas.
+Links HTTP são testados também na versão HTTPS (o player tenta essa versão primeiro).
+
+**Saúde no site (`src/lib/health.ts`, `useHealth`).** Uma única regra alimenta os selos, a ordem da lista, o filtro, o zapear e o
+Guia de TV. A lista ordena *no ar → não confirmado → instável → não abriu aqui → fora do ar*, mantendo a ordem de antes
+dentro de cada faixa; **nenhum canal some por causa do status**. O filtro *Ocultar canais fora do ar* começa **desligado** e a
+escolha fica salva (`tvlivre:ocultar-fora`). Canais que o navegador não consegue tocar aqui (HTTP sem HTTPS numa página segura,
+sem CORS e sem HLS nativo, cabeçalhos exigidos, outro formato) levam o selo *Não toca no navegador*, esteja o canal no ar ou não.
+**Sinal local:** um canal que deu erro ao tocar neste navegador fica em `tvlivre:falhas` por 7 dias, ganha o selo *Não abriu
+aqui* e desce na lista a partir da próxima sessão; se tocar de novo, sai do registro. Sem internet não conta. Nada disso sai do
+aparelho: não é métrica de audiência.
 O pipeline também detecta se o servidor envia cabeçalhos **CORS**; sem eles o navegador não consegue tocar o canal e o site avisa.
+
+**Origem e regiões.** Cada canal tem o país de origem (`country`, ISO 3166-1; `INT` = internacional). A **bandeira** vem do
+campo `flag` do `countries.json` do iptv-org e as **regiões** do `regions.json` (baixado pelo pipeline; se falhar, os países só
+ficam sem região). Os dois vão para `index.json` (`countries[].flag`, `countries[].regions`); o site não desenha bandeira a partir
+do código. Mostramos 8 regiões (`shared/regions.ts`): América do Sul, Central, Caribe, do Norte, Europa, África, Ásia e Oceania.
+A fonte **não divide o mundo de forma exclusiva**: um país pode estar em duas regiões (Rússia, Turquia, Cazaquistão, Geórgia,
+Armênia, Azerbaijão e Chipre estão na Europa e na Ásia) e alguns não estão em nenhuma (México, Hong Kong, Macau, Kosovo, Ilhas
+Faroé, Caribe Neerlandês): esses aparecem em **"Sem região na fonte"**. Internacional não tem bandeira (ícone de globo).
+
+**Guia de TV (`#/guia`).** Topo com o país (bandeira + nome), quantos canais e quantos no ar, e **Zapear em {país}**; abaixo, o
+seletor **região → país**; depois, atalhos por assunto e uma seção por categoria do iptv-org (um canal com várias categorias
+aparece em cada uma; "Geral" e "sem assunto" vão para o fim). Cada cartão: número, nome, programa de agora (se o país tem guia),
+selo de saúde, bandeira e qualidade; *Mostrar os N* abre a seção e *Abrir na grade* leva a `#/canais` filtrado. Ordem pela saúde,
+sem esconder ninguém. Também na abertura: uma faixa com as bandeiras dos países com mais canais no ar (cada uma abre o guia do
+país) e "Países por região" no lugar de "Outros países".
 
 **Salvaguardas.** O pipeline termina com erro, e portanto **não publica**, se uma fonte estiver fora do ar/inconsistente ou se o
 total de canais cair mais de 50% em relação à publicação anterior.
@@ -421,7 +450,7 @@ Rotas usam *hash* (`#/` tela inicial, `#/canais` player + grade, `#/canal/BR/<id
 build ainda copia `index.html` para `404.html`. Os atalhos do manifesto usam `#/zapear`, `#/favoritos` e `#/buscar`.
 
 `localStorage` (todas as leituras e escritas com `try/catch`): `tvlivre:favoritos`, `tvlivre:recentes`, `tvlivre:pais`,
-`tvlivre:ultimo`, `tvlivre:tema`, `tvlivre:mudo`, `tvlivre:instalar-dispensado`, `tvlivre:dica-deslizar`, `tvlivre:http-liberado`, `tvlivre:modo-tv`, `tvlivre:modo-audio` (`normal` | `economico` | `radio`), `tvlivre:timer-padrao` (`15` | `30` | `60` | `90` | `fim`), `tvlivre:dica-dados` e `tvlivre:transmitindo`; em `sessionStorage` (só enquanto a aba existe): `tvlivre:controle-sessao` (computador), `tvlivre:controle-par` (celular) e `tvlivre:presenca-aba` (id aleatório da aba, nunca enviado); `tvlivre:presenca-teste` (em `localStorage`) só para desenvolvimento e testes; `tvlivre:remote-broker` só para desenvolvimento (só existe durante uma transmissão que o usuário começou).
+`tvlivre:ultimo`, `tvlivre:tema`, `tvlivre:mudo`, `tvlivre:volume` (0 a 100), `tvlivre:ocultar-fora`, `tvlivre:falhas` (canais que não abriram aqui, 7 dias), `tvlivre:instalar-dispensado`, `tvlivre:dica-deslizar`, `tvlivre:http-liberado`, `tvlivre:modo-tv`, `tvlivre:modo-audio` (`normal` | `economico` | `radio`), `tvlivre:timer-padrao` (`15` | `30` | `60` | `90` | `fim`), `tvlivre:dica-dados` e `tvlivre:transmitindo`; em `sessionStorage` (só enquanto a aba existe): `tvlivre:controle-sessao` (computador), `tvlivre:controle-par` (celular) e `tvlivre:presenca-aba` (id aleatório da aba, nunca enviado); `tvlivre:presenca-teste` (em `localStorage`) só para desenvolvimento e testes; `tvlivre:remote-broker` só para desenvolvimento (só existe durante uma transmissão que o usuário começou).
 
 ## Créditos e licenças
 

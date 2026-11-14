@@ -1,7 +1,7 @@
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { DEFAULT_PROBE, judge, probeBatch, probeUrl, type ProbeOptions } from '../../scripts/lib/probe.ts';
+import { DEFAULT_PROBE, fromHealthEntry, healthFields, judge, maxHeight, probeBatch, probeUrl, resolutionLabel, toHealthEntry, type ProbeOptions } from '../../scripts/lib/probe.ts';
 import type { HealthEntry } from '../../shared/types.ts';
 
 let server: Server;
@@ -45,6 +45,8 @@ afterAll(() => new Promise<void>((r) => server.close(() => r())));
 describe('probeUrl', () => {
   it('manifesto válido → ok, e detecta CORS aberto', async () => {
     expect(await probeUrl({ url: `${base}/ok.m3u8`, kind: 'hls' }, opts)).toMatchObject({ ok: true, cors: true });
+    const r = await probeUrl({ url: `${base}/ok.m3u8`, kind: 'hls' }, opts);
+    expect(r.latencyMs).toBeGreaterThan(0); // tempo até a resposta, para a dica de latência
   });
   it('detecta ausência de CORS', async () => {
     expect(await probeUrl({ url: `${base}/nocors.m3u8`, kind: 'hls' }, opts)).toMatchObject({ ok: true, cors: false });
@@ -120,5 +122,35 @@ describe('probeBatch', () => {
     const res = await probeBatch(items, { ...opts, concurrency: 20, perHost: 3 }, undefined, fake);
     expect(res.size).toBe(30);
     expect(peak).toBeLessThanOrEqual(3);
+  });
+});
+
+describe('medidas do teste: latência, resolução e HTTPS', () => {
+  it('lê a maior variante de uma lista mestre e rotula a resolução', () => {
+    const master = '#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=800000,RESOLUTION=640x360\nlow.m3u8\n#EXT-X-STREAM-INF:BANDWIDTH=5000000,RESOLUTION=1920x1080,CODECS="avc1"\nhi.m3u8\n';
+    expect(maxHeight(master)).toBe(1080);
+    expect(maxHeight('#EXTM3U\n#EXTINF:6,\nseg1.ts\n')).toBeUndefined();
+    expect(resolutionLabel(1080)).toBe('1080p');
+    expect(resolutionLabel(1072)).toBe('1080p');
+    expect(resolutionLabel(404)).toBe('360p');
+    expect(resolutionLabel(undefined)).toBeUndefined();
+  });
+
+  it('o histórico guarda e devolve latência, resolução e HTTPS; entradas antigas (4 posições) continuam válidas', () => {
+    const j = { status: 'online' as const, fails: 0, cors: true, latencyMs: 230, height: 720, httpsOk: true };
+    const e = toHealthEntry(j, 60_000 * 100);
+    expect(e).toEqual([0, 0, 100, 1, 230, 720, 1]);
+    expect(fromHealthEntry(e)).toEqual(j);
+    expect(fromHealthEntry([2, 1, 100, 2])).toEqual({ status: 'desconhecido', fails: 1, cors: undefined });
+  });
+
+  it('falha mantém a resolução conhecida; sucesso traz as medidas novas', () => {
+    expect(judge({ ok: false, definitive: false, reason: 'TIMEOUT' }, [0, 0, 1, 1, 200, 1080, 0])).toMatchObject({ fails: 1, height: 1080 });
+    expect(judge({ ok: true, definitive: false, reason: 'HLS ok', cors: true, latencyMs: 90, height: 720 }, undefined)).toMatchObject({ latencyMs: 90, height: 720 });
+  });
+
+  it('campos publicados no canal: só os que têm valor', () => {
+    expect(healthFields({ status: 'online', fails: 0 }, undefined)).toEqual({});
+    expect(healthFields({ status: 'desconhecido', fails: 2, latencyMs: 300, height: 1080, httpsOk: true }, 123)).toEqual({ fails: 2, checked: 123, latency: 300, resolution: '1080p', httpsOk: true });
   });
 });

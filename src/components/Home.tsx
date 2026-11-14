@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { ArrowRight, Keyboard, Monitor, Power, Shuffle, Smartphone, Star, Tv } from 'lucide-react';
+import { ArrowRight, CalendarDays, Keyboard, Monitor, Power, Shuffle, Smartphone, Star, Tv } from 'lucide-react';
 import type { Channel, DataIndex } from '../../shared/types.ts';
 import { comecandoAgora, nowSec, useEpgVersion, useGuideClock } from '../lib/epg.ts';
 import { liveNow, parseChannelNumber, pickFeatured, topCategories, topCountries } from '../lib/home.ts';
-import { categoryLabel, countryName } from '../lib/labels.ts';
+import { categoryLabel, countryFlag, countryName } from '../lib/labels.ts';
 import { channelKey, formatNumber } from '../lib/lineup.ts';
-import { StatusMark } from './Badges.tsx';
+import { CountryTag, StatusMark } from './Badges.tsx';
+import { CountryPicker } from './CountryPicker.tsx';
 import { Mark, Wordmark } from './Mark.tsx';
 import { VisitStrip } from './Visits.tsx';
 import { fmtNum, type EmAlta } from '../lib/presenca-ui.ts';
@@ -41,6 +42,8 @@ interface Props {
   onCategory: (id: string) => void;
   onCountry: (code: string) => void;
   onAllCountries: () => void;
+  /** Abre o Guia de TV de um país. */
+  onGuide: (code: string) => void;
   onFavorites: () => void;
   onTv: () => void;
 }
@@ -78,7 +81,8 @@ export function Home(p: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channels, epgVersion, guideTick]);
   const cats = useMemo(() => topCategories(channels, 8), [channels]);
-  const countries = useMemo(() => topCountries(index, country, 12), [index, country]);
+  // vitrine de bandeiras: os países com mais canais no ar (bandeira só se a fonte tiver)
+  const flagStrip = useMemo(() => topCountries(index, '', 10).filter((c) => countryFlag(c.code)), [index]);
   const num = (c: Channel) => formatNumber(numbers.get(channelKey(c)));
   const countryLabel = countryName(country);
   const { byStatus, total } = index.meta;
@@ -105,6 +109,18 @@ export function Home(p: Props) {
             <p className="lead">
               {nf.format(total)} canais de {index.countries.length} países, direto no navegador. Sem cadastro, sem anúncios, sem instalar nada.
             </p>
+            {flagStrip.length > 0 && (
+              <ul className="flag-strip" aria-label="Guia de TV de alguns dos países" data-testid="home-bandeiras">
+                {flagStrip.map((c) => (
+                  <li key={c.code}>
+                    <button type="button" onClick={() => p.onGuide(c.code)} aria-label={`Guia de TV: ${countryName(c.code)}`} title={countryName(c.code)} data-pais={c.code}>
+                      <span className="flag" aria-hidden="true">{countryFlag(c.code)}</span>
+                    </button>
+                  </li>
+                ))}
+                <li><a className="flag-more" href="#/guia">+{nf.format(Math.max(index.countries.length - flagStrip.length, 0))} países</a></li>
+              </ul>
+            )}
             <div className="hero-actions">
               <button ref={primary} type="button" className="btn btn-accent btn-xl" onClick={p.onPower} data-testid="home-ligar">
                 <Power size={22} aria-hidden="true" />
@@ -226,7 +242,10 @@ export function Home(p: Props) {
 
         {cats.length > 0 && (
           <section className="sec" aria-labelledby="h-assuntos">
-            <div className="sec-head"><h2 id="h-assuntos">Por assunto</h2><span className="muted small">em {countryLabel}</span></div>
+            <div className="sec-head">
+              <h2 id="h-assuntos">Por assunto</h2>
+              <a className="link-btn" href="#/guia" data-testid="home-guia"><CalendarDays size={14} aria-hidden="true" className="inline-icon" /> Guia de TV de {countryLabel} <ArrowRight size={14} aria-hidden="true" className="inline-icon" /></a>
+            </div>
             <ul className="cats">
               {cats.map((c) => (
                 <li key={c.id}>
@@ -241,26 +260,8 @@ export function Home(p: Props) {
         )}
 
         <section className="sec" aria-labelledby="h-paises">
-          <div className="sec-head"><h2 id="h-paises">Outros países</h2></div>
-          <ul className="countries">
-            {countries.map((c) => (
-              <li key={c.code}>
-                <button type="button" className="country" aria-pressed={c.code === country} onClick={() => p.onCountry(c.code)}>
-                  <span className="country-code num">{c.code}</span>
-                  <span className="country-body">
-                    <span className="country-name">{countryName(c.code)}</span>
-                    <span className="muted">{nf.format(c.online)} no ar</span>
-                  </span>
-                </button>
-              </li>
-            ))}
-            <li>
-              <button type="button" className="country country-all" onClick={p.onAllCountries}>
-                <span className="country-code num">+{nf.format(Math.max(index.countries.length - countries.length, 0))}</span>
-                <span className="country-body"><span className="country-name">Todos os países</span><span className="muted">buscar no mundo</span></span>
-              </button>
-            </li>
-          </ul>
+          <div className="sec-head"><h2 id="h-paises">Países por região</h2><span className="muted small">{nf.format(index.countries.length)} catálogos</span></div>
+          <CountryPicker countries={index.countries} current={country} onCountry={p.onCountry} limit={12} onAllCountries={p.onAllCountries} idPrefix="home" />
         </section>
 
         <section className="sec ways" aria-labelledby="h-jeitos">
@@ -315,7 +316,7 @@ function Rail({ title, action, busy = false, children }: { title: string; action
 
 function Tile({ c, n, onTune, showCountry = false, star = false, prog, watching }: { c: Channel; n: string; onTune: (c: Channel) => void; showCountry?: boolean; star?: boolean; prog?: string; watching?: number }) {
   const cat = c.categories[0] ? categoryLabel(c.categories[0]) : null;
-  const meta = [cat, showCountry ? countryName(c.country) : null].filter(Boolean).join(' · ');
+  const meta = cat ?? '';
   return (
     <li>
       <button type="button" className="tile" onClick={() => onTune(c)}>
@@ -330,8 +331,9 @@ function Tile({ c, n, onTune, showCountry = false, star = false, prog, watching 
             </span>
           )}
           <span className="tile-meta">
-            <StatusMark status={c.status} withText={c.status !== 'online'} />
+            <StatusMark channel={c} withText={c.status !== 'online' || !!c.fails} />
             {star && <Star size={13} aria-hidden="true" className="tile-star" />}
+            <CountryTag code={c.country} short={!showCountry} />
             {meta && <span className="tile-sub">{meta}</span>}
           </span>
         </span>

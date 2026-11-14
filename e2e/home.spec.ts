@@ -16,7 +16,7 @@ test('tela inicial: uma ideia, uma ação principal, números reais e navegaçã
   await expect(stats).toContainText('no ar agora');
   await expect(page.getByRole('heading', { name: /^No ar agora · Brasil/ })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Por assunto' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Outros países' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Países por região' })).toBeVisible();
   // o app (player + grade) vive em #/canais
   await page.getByTestId('home-canais').click();
   await expect(page).toHaveURL(/#\/canais$/);

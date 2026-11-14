@@ -10,20 +10,22 @@
  * Termina com código 1 (e NÃO grava nada) se alguma fonte estiver fora do ar ou
  * se o total de canais cair mais de 50% em relação à última publicação.
  */
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import type { Channel, DataMeta, HealthEntry, HealthFile, Status } from '../shared/types.ts';
+import { countryGeo } from '../shared/regions.ts';
 import { fetchJson, fetchText } from './lib/fetch-source.ts';
 import type { OrgData } from './lib/iptvorg-types.ts';
 import type { Removals } from './lib/removals.ts';
+import { canonCountry } from './lib/normalize.ts';
 import { assemble, buildIndex, sortChannels, toPublicChannel } from './lib/pipeline.ts';
 import {
   DEFAULT_PROBE,
-  corsFromCode,
+  fromHealthEntry,
+  healthFields,
   judge,
   probeBatch,
   probeYouTubeVideo,
-  statusFromCode,
   toHealthEntry,
   urlHealthKey,
   type BatchItem,
@@ -34,6 +36,8 @@ const FREE_TV_URL = 'https://raw.githubusercontent.com/Free-TV/IPTV/master/playl
 const ORG_API = 'https://iptv-org.github.io/api';
 const SITE_URL = (process.env.SITE_URL ?? 'https://jkfa.github.io/tv-livre').replace(/\/$/, '');
 const MAX_DROP = 0.5;
+/** Chave extra no lote de testes para a versão HTTPS de um link HTTP. */
+const HTTPS_SUFFIX = '#https';
 const REUSE_MINUTES = Number(process.env.PROBE_REUSE_MINUTES ?? 360);
 
 const args = process.argv.slice(2);
@@ -56,6 +60,7 @@ async function loadSources(): Promise<{ freeTv: string; org: OrgData }> {
       org: {
         channels: j('channels'), feeds: j('feeds'), streams: j('streams'),
         logos: j('logos'), blocklist: j('blocklist'), countries: j('countries'),
+        regions: existsSync(join(orgDir, 'regions.json')) ? j('regions') : undefined,
       },
     };
   }
@@ -69,7 +74,12 @@ async function loadSources(): Promise<{ freeTv: string; org: OrgData }> {
     fetchJson<OrgData['blocklist']>(`${ORG_API}/blocklist.json`),
     fetchJson<OrgData['countries']>(`${ORG_API}/countries.json`),
   ]);
-  return { freeTv, org: { channels, feeds, streams, logos, blocklist, countries } };
+  // Regiões só agrupam países na interface: se a API falhar, publica sem elas.
+  const regions = await fetchJson<NonNullable<OrgData['regions']>>(`${ORG_API}/regions.json`).catch((err: unknown) => {
+    log(`aviso: regiões indisponíveis (${err instanceof Error ? err.message : err}); os países ficam sem região`);
+    return undefined;
+  });
+  return { freeTv, org: { channels, feeds, streams, logos, blocklist, countries, regions } };
 }
 
 /** Validação mínima: uma fonte "viva" mas vazia/quebrada também deve barrar a publicação. */
@@ -135,10 +145,13 @@ async function main() {
     if (m.kind === 'youtube' || !probeable) continue;
     const fresh = prev && (noNewProbes || nowMs / 60_000 - prev[2] < REUSE_MINUTES) && (noNewProbes || m.kind !== 'other');
     if (fresh) {
-      judged.set(m.id, { status: statusFromCode(prev[0]), fails: prev[1], cors: corsFromCode(prev[3]) });
+      judged.set(m.id, fromHealthEntry(prev));
       newHealth[hk] = prev;
     } else if (!noNewProbes && toProbe.length < probeLimit) {
       toProbe.push({ key: m.id, id: m.id, url: m.url, kind: m.kind, headers: m.probeHeaders });
+      // link HTTP: a página é HTTPS, então o player tenta primeiro o mesmo endereço por HTTPS. Testamos essa versão também:
+      // se ela responde com CORS, o canal toca no navegador sem conteúdo misto.
+      if (/^http:/i.test(m.url)) toProbe.push({ key: `${m.id}${HTTPS_SUFFIX}`, id: m.id, url: m.url.replace(/^http:/i, 'https:'), kind: 'hls', headers: m.probeHeaders });
     }
   }
   log(`links a testar: ${toProbe.length} (reaproveitados do histórico: ${judged.size})`);
@@ -150,10 +163,14 @@ async function main() {
       log(`  testados ${d}/${t} (${Math.round((Date.now() - t0) / 1000)}s)`),
     );
     const byId = new Map(merged.map((m) => [m.id, m]));
-    for (const [id, outcome] of outcomes) {
+    for (const [key, outcome] of outcomes) {
+      if (key.endsWith(HTTPS_SUFFIX)) continue;
+      const id = key;
       const m = byId.get(id)!;
       const hk = urlHealthKey(m.url);
       const j = judge(outcome, prevHealth[hk]);
+      const viaHttps = outcomes.get(`${id}${HTTPS_SUFFIX}`);
+      if (viaHttps?.ok && viaHttps.cors === true) j.httpsOk = true;
       judged.set(id, j);
       newHealth[hk] = toHealthEntry(j, nowMs) as HealthEntry;
       if (outcome.kind && outcome.kind !== m.kind) kindUpgrade.set(id, outcome.kind);
@@ -182,6 +199,7 @@ async function main() {
       { ...m, kind: kindUpgrade.get(m.id) ?? m.kind, ...(j && j.cors === false ? { cors: false } : {}) },
       status,
     );
+    if (j && !yt) Object.assign(pub, healthFields(j, newHealth[urlHealthKey(m.url)]?.[2]));
     if (yt && pub.youtube) pub.youtube = { ...pub.youtube, embeddable: pub.youtube.embeddable && yt.embeddable };
     return pub;
   });
@@ -190,7 +208,11 @@ async function main() {
   const { index, byCountry } = buildIndex(sortChannels(channels), generatedAt, [
     { name: 'Free-TV/IPTV', url: 'https://github.com/Free-TV/IPTV' },
     { name: 'iptv-org/iptv', url: 'https://github.com/iptv-org/iptv' },
-  ]);
+  ], countryGeo({
+    // mesma unificação de códigos dos canais (o iptv-org chama o Reino Unido de "UK")
+    countries: org.countries.map((c) => ({ ...c, code: canonCountry(c.code) })),
+    regions: (org.regions ?? []).map((r) => ({ ...r, countries: r.countries.map(canonCountry) })),
+  }));
 
   const out = resolve(opt('out') ?? 'public/data');
   rmSync(out, { recursive: true, force: true });

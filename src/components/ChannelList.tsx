@@ -2,10 +2,10 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Star } from 'lucide-react';
 import type { Channel } from '../../shared/types.ts';
-import { categoryLabel, countryName } from '../lib/labels.ts';
+import { categoryLabel } from '../lib/labels.ts';
 import { agora, hasEpg, useEpgVersion, useGuideClock } from '../lib/epg.ts';
 import { channelKey, formatNumber } from '../lib/lineup.ts';
-import { ChannelBadges, StatusMark } from './Badges.tsx';
+import { ChannelBadges, CountryTag, StatusMark } from './Badges.tsx';
 import { ProgressBar } from './Guide.tsx';
 
 interface Props {
@@ -101,7 +101,7 @@ export function ChannelList({ channels, numbers, selectedKey, showCountry, isFav
           const fav = isFavorite(ch);
           const selected = selectedKey === key;
           const prog = anyGuide ? agora(ch, t) : null;
-          const sub = [showCountry ? countryName(ch.country) : '', ch.categories[0] ? categoryLabel(ch.categories[0]) : ''].filter(Boolean).join(' · ');
+          const sub = ch.categories[0] ? categoryLabel(ch.categories[0]) : '';
           return (
             <li
               key={key}
@@ -120,7 +120,8 @@ export function ChannelList({ channels, numbers, selectedKey, showCountry, isFav
                     </span>
                   )}
                   <span className="row-meta">
-                    <StatusMark status={ch.status} withText />
+                    <StatusMark channel={ch} withText />
+                    <CountryTag code={ch.country} short={!showCountry} />
                     {sub && <span className="row-sub">{sub}</span>}
                     <ChannelBadges channel={ch} />
                   </span>

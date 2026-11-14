@@ -36,12 +36,26 @@ export interface Channel {
   /** O link exige User-Agent/Referer customizados, que o navegador não consegue enviar. */
   needsHeaders?: boolean;
   youtube?: YouTubeRef;
+  /** Falhas SEGUIDAS no teste diário de links (ausente = 0). Zera quando o link responde. 1–2 = instável. */
+  fails?: number;
+  /** Quando o link foi testado pela última vez: minutos desde a época (UTC). Ausente = nunca testado. */
+  checked?: number;
+  /** Tempo até a primeira resposta do servidor no teste, em ms (medido nos EUA: é uma dica, não a experiência do usuário). */
+  latency?: number;
+  /** Maior resolução anunciada pela lista HLS (ex.: "1080p"), quando a lista traz variantes. */
+  resolution?: string;
+  /** Link HTTP que também responde por HTTPS com CORS: o player toca pela versão HTTPS, sem conteúdo misto. */
+  httpsOk?: true;
 }
 
 export interface CountrySummary {
   code: string;
   count: number;
   online: number;
+  /** Bandeira (emoji) do iptv-org (countries.json). Ausente = a fonte não tem. */
+  flag?: string;
+  /** Regiões do iptv-org (regions.json) a que o país pertence, entre as de shared/regions.ts. Pode ter mais de uma ou nenhuma. */
+  regions?: string[];
 }
 
 export interface FacetCount {
@@ -70,8 +84,12 @@ export interface DataIndex {
   languages: FacetCount[];
 }
 
-/** Forma do arquivo data/health.json: chave = hash curto da URL. [status, falhas seguidas, minutos desde a época, cors] */
-export type HealthEntry = [0 | 1 | 2, number, number, 0 | 1 | 2];
+/**
+ * Forma do arquivo data/health.json: chave = hash curto da URL.
+ * [status, falhas seguidas, minutos desde a época, cors, latência em ms (0 = sem medida), altura da maior variante (0 = sem dado), HTTPS ok (0/1)]
+ * As três últimas posições são opcionais: arquivos antigos têm só as quatro primeiras.
+ */
+export type HealthEntry = [0 | 1 | 2, number, number, 0 | 1 | 2, number?, number?, (0 | 1)?];
 export type HealthFile = Record<string, HealthEntry>;
 
 /** O canal toca dentro do navegador (HTTPS + CORS) ou por embed oficial? */

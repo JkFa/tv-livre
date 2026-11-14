@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Airplay, Cast, ChevronLeft, ChevronRight, Download, ExternalLink, Maximize, Minimize, Pause, PictureInPicture2, Play, Power,
-  RotateCw, ScreenShare, Share2, ShieldCheck, Star, Volume2, VolumeX, WifiOff,
+  Airplay, Cast, ChevronLeft, ChevronRight, Download, ExternalLink, Maximize, Maximize2, Minimize, Pause, PictureInPicture2, Play, Power,
+  RotateCw, ScreenShare, Share2, ShieldCheck, Shuffle, Star, Volume1, Volume2, VolumeX, WifiOff, X,
 } from 'lucide-react';
 import { MIN_PUBLICO, textoCanal } from '../lib/presenca-ui.ts';
 import type { Channel } from '../../shared/types.ts';
@@ -16,14 +16,16 @@ import { ConsumoSessao, conexaoFraca, dicaDadosDispensada, dispensarDicaDados, t
 import { getTimerPadrao, type OpcaoTimer } from '../lib/timer.ts';
 import { useSleepTimer } from '../lib/useSleepTimer.ts';
 import { useAirPlay, useRemotePlayback } from '../lib/transporte.ts';
-import { categoryLabel, countryFlag, countryName } from '../lib/labels.ts';
+import { categoryLabel, countryName } from '../lib/labels.ts';
 import { CAUSAS_CAST, CAUSES, UNSUPPORTED, type UnsupportedWhy } from '../lib/messages.ts';
-import { getMuted, markSwipeHintSeen, setMuted as saveMuted, swipeHintSeen } from '../lib/prefs.ts';
+import { getMuted, getVolume, markSwipeHintSeen, setMuted as saveMuted, setVolume as saveVolume, swipeHintSeen } from '../lib/prefs.ts';
+import { clearLocalFailure, recordLocalFailure } from '../lib/local-failures.ts';
+import { applySlider, sliderValue, toggleMuted, VOLUME_STEP, volumeIcon, volumeSettable, type Sound } from '../lib/volume.ts';
 import { caps, isPlayableHere, unsupportedReason, type Engine } from '../lib/playback.ts';
 import { isTvNow } from '../lib/tvmode.ts';
 import { canAllowInsecure, downloadM3u, platform, siteSettingsAddress, vlcHref } from '../lib/vlc.ts';
 import { useMediaSession, useWakeLock } from '../lib/media.ts';
-import { ChannelBadges, StatusMark } from './Badges.tsx';
+import { ChannelBadges, CountryTag, StatusMark } from './Badges.tsx';
 import { CastPanel, type CastErro } from './CastPanel.tsx';
 import { ChannelLogo } from './ChannelLogo.tsx';
 import { GuideStrip } from './Guide.tsx';
@@ -73,6 +75,12 @@ interface Props {
   onModo: (m: ModoAudio) => void;
   /** Quantas pessoas assistem ESTE canal agora (o serviço só informa com 3 ou mais; null = não mostrar). */
   assistindoCanal?: number | null;
+  /** Mini-player: o MESMO player (mesmo <video>), reduzido a uma janela fixa enquanto o usuário navega por outras telas. */
+  mini?: boolean;
+  onExpand?: () => void;
+  onClose?: () => void;
+  /** Zapear (sorteio único de lib/zapear.ts); no mini-player o sorteado entra na própria janela. */
+  onShuffle?: () => void;
 }
 
 /** Soma dos bytes reais dos trechos baixados nesta sessão (vale para todos os canais até recarregar a página). */
@@ -99,6 +107,7 @@ const EDGE = 24; // as bordas da tela pertencem aos gestos do sistema (voltar)
 
 export function Player(props: Props) {
   const { channel, armed, online, onArm, onZap, onPlayingChange } = props;
+  const mini = props.mini === true;
   const wrapRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const touchRef = useRef<{ x: number; y: number; t: number } | null>(null);
@@ -108,8 +117,9 @@ export function Player(props: Props) {
   const [paused, setPaused] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [muted, setMutedState] = useState(() => getMuted());
-  const [volume, setVolume] = useState(1);
-  const volumeRef = useRef(1);
+  const [volume, setVolume] = useState(() => getVolume());
+  const volumeRef = useRef(volume);
+  const mutedRef = useRef(muted);
   const [forced, setForced] = useState(false);
   const [copied, setCopied] = useState(false);
   const [howOpen, setHowOpen] = useState(false);
@@ -217,11 +227,31 @@ export function Player(props: Props) {
 
   useEffect(() => onPlayingChange(playing && !paused), [playing, paused, onPlayingChange]);
 
+  // sinal local (só deste navegador, 7 dias): o canal não abriu → desce na lista na próxima sessão; tocou → sai do registro.
+  // Sem internet não é culpa do canal, então não conta.
+  const errCause = hlsActive && state.phase === 'error' ? state.cause : null;
+  const tocou = hlsActive && state.phase === 'playing';
+  useEffect(() => {
+    if (!channelId) return;
+    if (tocou) clearLocalFailure(channelId);
+    else if (errCause && errCause !== 'device' && online) recordLocalFailure(channelId);
+  }, [channelId, tocou, errCause, online]);
+
   // volume do usuário (celular ou teclado); o timer de desligar baixa o volume em cima dele e o restaura
   useEffect(() => {
     volumeRef.current = volume;
-    for (const el of [videoRef.current, audioRef.current]) if (el) el.volume = volume;
-  }, [volume, mode, radio]);
+    const apply = () => {
+      for (const el of [videoRef.current, audioRef.current]) if (el && Math.abs(el.volume - volumeRef.current) > 0.005) el.volume = volumeRef.current;
+    };
+    apply();
+    // O WebKit, ao começar a tocar, às vezes volta o volume para 100% e ignora o que foi atribuído naquele instante:
+    // por isso o volume é reaplicado quando a fase muda (state.phase) e conferido de novo logo depois.
+    const timers = [setTimeout(apply, 400), setTimeout(apply, 1500)];
+    return () => timers.forEach(clearTimeout);
+  }, [volume, mode, radio, state.phase]);
+  useEffect(() => {
+    mutedRef.current = muted;
+  }, [muted]);
   const erroMidia = hlsActive && state.phase === 'error' ? CAUSES[state.cause].title : undefined;
   const { onMidia } = props;
   useEffect(() => onMidia?.({ tocando: playing && !paused, mudo: muted, volume, erro: erroMidia }), [onMidia, playing, paused, muted, volume, erroMidia]);
@@ -334,12 +364,23 @@ export function Player(props: Props) {
     if (v.paused) void v.play().catch(() => undefined);
     else v.pause();
   }, [radio]);
-  const toggleMute = useCallback(() => {
-    setMutedState((m) => {
-      saveMuted(!m);
-      return !m;
-    });
+  /** Volume e mudo mudam juntos e ficam salvos (`tvlivre:volume`, `tvlivre:mudo`) para a próxima sessão. */
+  const applySound = useCallback((s: Sound) => {
+    volumeRef.current = s.volume;
+    mutedRef.current = s.muted;
+    setVolume(s.volume);
+    setMutedState(s.muted);
+    saveVolume(s.volume);
+    saveMuted(s.muted);
   }, []);
+  const toggleMute = useCallback(() => applySound(toggleMuted({ volume: volumeRef.current, muted: mutedRef.current })), [applySound]);
+  const onSlider = useCallback(
+    (value: number) => {
+      applySound(applySlider({ volume: volumeRef.current, muted: mutedRef.current }, value));
+      poke();
+    },
+    [applySound, poke],
+  );
 
   // atalhos de teclado que dependem do player chegam por eventos do documento (ver useShortcuts)
   useEffect(() => {
@@ -360,14 +401,10 @@ export function Player(props: Props) {
     const onCmdV = (e: Event) => {
       const { cmd, valor } = (e as CustomEvent<{ cmd: string; valor: number | boolean }>).detail;
       if (cmd === 'volume' && typeof valor === 'number') {
-        setVolume(valor);
-        if (valor > 0) {
-          setMutedState(false);
-          saveMuted(false);
-        }
+        const v = Math.min(1, Math.max(0, valor));
+        applySound({ volume: v, muted: v > 0 ? false : mutedRef.current });
       } else if (cmd === 'mudo' && typeof valor === 'boolean') {
-        setMutedState(valor);
-        saveMuted(valor);
+        applySound({ volume: volumeRef.current, muted: valor });
       } else if (cmd === 'tocar') {
         const el = radio ? audioRef.current : videoRef.current;
         if (valor === true) void el?.play().catch(() => undefined);
@@ -376,7 +413,7 @@ export function Player(props: Props) {
     };
     document.addEventListener('tvlivre:cmdv', onCmdV);
     return () => document.removeEventListener('tvlivre:cmdv', onCmdV);
-  }, [radio]);
+  }, [radio, applySound]);
 
   const copyLink = useCallback(async () => {
     if (!channel) return;
@@ -388,7 +425,8 @@ export function Player(props: Props) {
   // ---- gestos: deslizar troca de canal; a rolagem vertical continua livre (touch-action: pan-y) ----
   const onTouchStart = (e: React.TouchEvent) => {
     const t = e.touches[0];
-    if (!t || e.touches.length > 1) return (touchRef.current = null);
+    // arrastar o controle de volume não é deslizar para trocar de canal
+    if (!t || e.touches.length > 1 || (e.target as HTMLElement).closest('input')) return (touchRef.current = null);
     const w = window.innerWidth;
     touchRef.current = t.clientX < EDGE || t.clientX > w - EDGE ? null : { x: t.clientX, y: t.clientY, t: Date.now() };
   };
@@ -408,7 +446,8 @@ export function Player(props: Props) {
     }
   };
   const onPointerUp = (e: React.PointerEvent) => {
-    if ((e.target as HTMLElement).closest('button, a, summary, details')) return;
+    if ((e.target as HTMLElement).closest('button, a, summary, details, input')) return;
+    if (mini) return props.onExpand?.(); // no mini-player, tocar na imagem volta para o player grande
     if (e.pointerType === 'mouse') {
       if (hlsActive && state.phase !== 'error') togglePlay();
       poke();
@@ -451,9 +490,15 @@ export function Player(props: Props) {
   const showSpinner = hlsActive && (state.phase === 'loading' || state.phase === 'reconnecting' || state.phase === 'buffering');
   const errorState = hlsActive && state.phase === 'error' ? state : null;
   const phaseAttr = !online && mode === 'hls' ? 'offline' : mode !== 'hls' ? mode : !armed ? 'ready' : state.phase;
+  const miniCover =
+    !online && mode === 'hls' ? 'Sem internet'
+    : errorState || mode === 'unsupported' || mode === 'youtube-link' ? 'Sem sinal'
+    : showSpinner ? (state.phase === 'reconnecting' ? 'Reconectando…' : 'Carregando…')
+    : radio ? 'Rádio'
+    : null;
 
   return (
-    <div className="player" data-testid="player">
+    <div className="player" data-testid="player" data-mini={mini ? 'on' : undefined}>
       <div
         className="stage"
         ref={wrapRef}
@@ -463,12 +508,12 @@ export function Player(props: Props) {
         data-bitrate={info?.bitrate ?? undefined}
         data-nivel-audio={info?.audioOnly ? 'on' : undefined}
         data-controls={controlsOn || paused || !!errorState || !armed ? 'on' : 'off'}
-        onTouchStart={onTouchStart}
-        onTouchEnd={onTouchEnd}
+        onTouchStart={mini ? undefined : onTouchStart}
+        onTouchEnd={mini ? undefined : onTouchEnd}
         onPointerUp={onPointerUp}
         onPointerMove={(e) => e.pointerType === 'mouse' && hlsActive && poke()}
         onFocus={() => poke()}
-        onDoubleClick={() => void toggleFullscreen()}
+        onDoubleClick={mini ? undefined : () => void toggleFullscreen()}
       >
         {mode === 'hls' && <HlsStage channel={channel} force={forced} active={hlsActive} attempt={attempt} muted={muted} videoRef={videoRef} onState={setState} onPausedChange={setPaused} nativeOnly={nativeOnly} onEngine={setEngine} modo={modoEfetivo} audioRef={audioRef} onInfo={setInfo} onBytes={(n) => consumoSessao.add(n)} />}
 
@@ -639,6 +684,9 @@ export function Player(props: Props) {
           </button>
         )}
 
+        {/* mini-player: os painéis do player grande ficam escondidos (CSS); um rótulo curto diz o que está acontecendo */}
+        {mini && miniCover && <p className="mini-cover" role="status">{miniCover}</p>}
+
         {(mode === 'hls' || mode === 'embed') && armed && (
           <div className="controls">
             {mode === 'hls' && (
@@ -646,9 +694,7 @@ export function Player(props: Props) {
                 <button type="button" className="ctl" onClick={togglePlay} aria-label={paused ? 'Tocar' : 'Pausar'}>
                   {paused ? <Play size={22} fill="currentColor" /> : <Pause size={22} fill="currentColor" />}
                 </button>
-                <button type="button" className="ctl" onClick={toggleMute} aria-pressed={muted} aria-label={muted ? 'Ativar o som' : 'Silenciar'}>
-                  {muted ? <VolumeX size={22} /> : <Volume2 size={22} />}
-                </button>
+                <VolumeControl volume={volume} muted={muted} onToggle={toggleMute} onSlider={onSlider} />
               </>
             )}
             <span className="ctl-spacer" />
@@ -679,6 +725,37 @@ export function Player(props: Props) {
         )}
       </div>
 
+      {mini ? (
+        <div className="mini-bar" data-testid="mini-player">
+          <p className="mini-title">
+            <span className="num" aria-hidden="true">{props.number}</span>
+            <span className="mini-name">{channel.name}</span>
+          </p>
+          <div className="mini-ctls">
+            {mode === 'hls' && hlsActive && (
+              <>
+                <button type="button" className="ctl" onClick={togglePlay} aria-label={paused ? 'Tocar' : 'Pausar'}>
+                  {paused ? <Play size={20} fill="currentColor" /> : <Pause size={20} fill="currentColor" />}
+                </button>
+                <VolumeControl volume={volume} muted={muted} onToggle={toggleMute} onSlider={onSlider} />
+              </>
+            )}
+            <span className="ctl-spacer" />
+            {props.onShuffle && (
+              <button type="button" className="ctl" onClick={props.onShuffle} aria-label="Zapear: sortear outro canal aqui no mini-player" title="Zapear" data-testid="mini-zapear">
+                <Shuffle size={20} />
+              </button>
+            )}
+            <button type="button" className="ctl" onClick={props.onExpand} aria-label={`Expandir: voltar ao canal ${props.number} ${channel.name}`} title="Expandir" data-testid="mini-expandir">
+              <Maximize2 size={20} />
+            </button>
+            <button type="button" className="ctl" onClick={props.onClose} aria-label="Fechar o mini-player e parar o canal" title="Fechar" data-testid="mini-fechar">
+              <X size={20} />
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
       <Dial {...props} channel={channel} onToggleFavorite={props.onToggleFavorite} />
       {props.assistindoCanal != null && props.assistindoCanal >= MIN_PUBLICO && (
         <p className="watching" data-testid="assistindo-canal">
@@ -706,9 +783,9 @@ export function Player(props: Props) {
         <div className="now-body">
           <h2>{channel.name}</h2>
           <p className="now-meta">
-            <span>{countryFlagText(channel.country)}</span>
+            <CountryTag code={channel.country} />
             {channel.categories[0] && <span>{categoryLabel(channel.categories[0])}</span>}
-            <StatusMark status={channel.status} withText />
+            <StatusMark channel={channel} withText />
             <ChannelBadges channel={channel} />
           </p>
           {mode === 'embed' && cast.suportado && (
@@ -728,6 +805,8 @@ export function Player(props: Props) {
         </div>
         <ChannelLogo name={channel.name} src={channel.logo} size={56} />
       </div>
+        </>
+      )}
       <HttpSheet open={howOpen} onClose={() => setHowOpen(false)} />
       <TimerSheet
         open={timerOpen}
@@ -744,7 +823,37 @@ export function Player(props: Props) {
   );
 }
 
-const countryFlagText = (c: string) => `${countryFlag(c)} ${countryName(c)}`.trim();
+/**
+ * Som: o ícone alterna o mudo (e devolve o volume de antes); o controle deslizante vai de 0 a 100 e funciona com mouse, toque
+ * e teclado (setas, Home/End). Onde o navegador não deixa o site mudar o volume (iPhone/iPad), fica só o botão de mudo.
+ */
+function VolumeControl({ volume, muted, onToggle, onSlider }: { volume: number; muted: boolean; onToggle: () => void; onSlider: (value: number) => void }) {
+  const sound = { volume, muted };
+  const icon = volumeIcon(sound);
+  const value = sliderValue(sound);
+  return (
+    <>
+      <button type="button" className="ctl" onClick={onToggle} aria-pressed={muted} aria-label={muted ? 'Ativar o som' : 'Silenciar'} title={muted ? 'Ativar o som (M)' : 'Silenciar (M)'}>
+        {icon === 'off' ? <VolumeX size={22} /> : icon === 'low' ? <Volume1 size={22} /> : <Volume2 size={22} />}
+      </button>
+      {volumeSettable() && (
+        <input
+          type="range"
+          className="vol"
+          min={0}
+          max={100}
+          step={VOLUME_STEP}
+          value={value}
+          onChange={(e) => onSlider(Number(e.target.value))}
+          aria-label="Volume"
+          aria-valuetext={muted ? 'Mudo' : `${value}%`}
+          data-testid="volume"
+        />
+      )}
+    </>
+  );
+}
+
 
 /** Abre o canal no VLC sem copiar nada: celular por link direto; computador por um .m3u de um clique. */
 function VlcOpen({ channel, variant = 'accent' }: { channel: Channel; variant?: 'accent' | 'plain' }) {
@@ -935,7 +1044,7 @@ function Problem({ title, text, detail, tone, icon, actions, extra, suggestions,
   );
 }
 
-function Dial({ channel, number, prev, next, onZap, isFavorite, onToggleFavorite, onShare }: Props & { channel: Channel }) {
+function Dial({ channel, number, prev, next, onZap, isFavorite, onToggleFavorite, onShare, onShuffle }: Props & { channel: Channel }) {
   return (
     <div className="dial" role="group" aria-label="Controle de canais">
       <button type="button" className="dial-side" onClick={() => onZap(-1)} aria-label={prev ? `Canal anterior: ${prev.number} ${prev.name}` : 'Canal anterior'} disabled={!prev}>
@@ -951,6 +1060,9 @@ function Dial({ channel, number, prev, next, onZap, isFavorite, onToggleFavorite
       </button>
       <button type="button" className="dial-share" onClick={onShare} aria-label="Compartilhar este canal" title="Compartilhar (S)" data-testid="share-btn">
         <Share2 size={20} aria-hidden="true" />
+      </button>
+      <button type="button" className="dial-zap" onClick={onShuffle} disabled={!onShuffle} aria-label="Zapear: sortear um canal no ar" title="Zapear (Z)" data-testid="player-zapear">
+        <Shuffle size={20} aria-hidden="true" />
       </button>
       <button type="button" className="dial-side" onClick={() => onZap(1)} aria-label={next ? `Próximo canal: ${next.number} ${next.name}` : 'Próximo canal'} disabled={!next}>
         <span className="num">{next?.number ?? ''}</span>

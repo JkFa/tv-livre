@@ -1,4 +1,5 @@
 import type { Channel } from '../../shared/types.ts';
+import { browserBlock } from './health.ts';
 import { readString, writeString } from './storage.ts';
 
 /**
@@ -117,13 +118,11 @@ export function unsupportedReason(ch: Pick<Channel, 'url' | 'kind' | 'cors' | 'n
 
 /**
  * O canal deve ser oferecido como "toca aqui" (zapear, filtro "só os que tocam", selo)?
- * HTTP em página HTTPS só conta depois que o usuário liberou o HTTP e comprovamos que funciona.
+ * HTTP em página HTTPS só conta se a versão HTTPS respondeu no teste diário (`httpsOk`) ou depois que o usuário liberou o HTTP.
  */
 export function isPlayableHere(ch: Channel, caps: Caps): boolean {
   if (ch.kind === 'youtube') return ch.youtube?.embeddable === true;
-  if (ch.kind === 'other' || ch.needsHeaders) return false;
-  if (ch.kind === 'http' && caps.pageSecure && !caps.httpOk) return false;
-  return ch.cors !== false ? caps.mse || caps.nativeHls : caps.nativeHls;
+  return browserBlock(ch, caps) === null; // mesma regra dos selos "Não toca no navegador" (health.ts)
 }
 
 export function caps(): Caps {

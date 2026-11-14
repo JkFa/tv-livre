@@ -1,6 +1,7 @@
-import type { DataIndex, Status } from '../../shared/types.ts';
+import type { DataIndex } from '../../shared/types.ts';
 import type { Filters } from '../lib/filter.ts';
-import { categoryLabel, countryName, languageName, STATUS_LABELS } from '../lib/labels.ts';
+import { categoryLabel, countryName, languageName } from '../lib/labels.ts';
+import { HEALTH_LABELS, type Health } from '../lib/health.ts';
 import { Sheet } from './Sheet.tsx';
 
 export const ALL_COUNTRIES = 'ALL';
@@ -19,7 +20,7 @@ interface Props {
 }
 
 export function activeFilterCount(f: Filters): number {
-  return [f.category, f.language, f.status].filter(Boolean).length + (f.playableOnly ? 1 : 0) + (f.startingNow ? 1 : 0) + (f.listen ? 1 : 0) + (f.trending ? 1 : 0);
+  return [f.category, f.language, f.status].filter(Boolean).length + (f.hideOffline ? 1 : 0) + (f.playableOnly ? 1 : 0) + (f.startingNow ? 1 : 0) + (f.listen ? 1 : 0) + (f.trending ? 1 : 0);
 }
 
 export function FilterSheet({ open, onClose, index, country, onCountry, filters, onFilters, resultCount, presencaOn = false }: Props) {
@@ -30,7 +31,7 @@ export function FilterSheet({ open, onClose, index, country, onCountry, filters,
     return countryName(a.code).localeCompare(countryName(b.code), 'pt-BR');
   });
   const langs = [...index.languages].map((l) => ({ ...l, name: languageName(l.id) })).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
-  const clear = () => onFilters({ ...filters, category: '', language: '', status: '', playableOnly: false, startingNow: false, listen: false, trending: false });
+  const clear = () => onFilters({ ...filters, category: '', language: '', status: '', hideOffline: false, playableOnly: false, startingNow: false, listen: false, trending: false });
 
   return (
     <Sheet
@@ -89,15 +90,21 @@ export function FilterSheet({ open, onClose, index, country, onCountry, filters,
 
       <fieldset className="field">
         <legend>Status</legend>
-        <div className="seg">
+        <div className="seg seg-saude">
           <button type="button" aria-pressed={!filters.status} onClick={() => set({ status: '' })}>Todos</button>
-          {(Object.keys(STATUS_LABELS) as Status[]).map((s) => (
+          {(['ok', 'instavel', 'nao-confirmado', 'fora'] as Health[]).map((s) => (
             <button key={s} type="button" aria-pressed={filters.status === s} onClick={() => set({ status: filters.status === s ? '' : s })}>
-              {STATUS_LABELS[s]}
+              {HEALTH_LABELS[s]}
             </button>
           ))}
         </div>
+        <p className="field-note">Resultado do teste diário dos links, feito em servidores nos EUA: um canal pode tocar daqui mesmo marcado como fora do ar.</p>
       </fieldset>
+
+      <label className="check">
+        <input type="checkbox" checked={filters.hideOffline} onChange={(e) => set({ hideOffline: e.target.checked })} data-testid="filter-ocultar-fora" />
+        <span>Ocultar canais fora do ar</span>
+      </label>
 
       {presencaOn && (
         <label className="check">

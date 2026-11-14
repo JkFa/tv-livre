@@ -249,3 +249,46 @@ html[data-tv='on'] .tv-emalta-item:focus-visible { background: var(--raised); ou
 html[data-tv='on'] .visits-total .num { font-size: 88px; }
 html[data-tv='on'] .visits-label { font-size: 18px; }
 html[data-tv='on'] .visits-region strong { font-size: 38px; }
+
+/* ===== origem dos canais: bandeira (dos dados do iptv-org) + país ===== */
+.flag { font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif; line-height: 1; }
+.flag-lg { font-size: 26px; }
+.country-tag { display: inline-flex; align-items: center; gap: 4px; flex: none; color: var(--muted); }
+.country-tag .flag { font-size: 14px; }
+.country-globe { flex: none; }
+.chip-n { color: var(--muted); font-size: 13px; }
+.chip[aria-pressed='true'] .chip-n { color: inherit; opacity: 0.75; }
+
+/* vitrine de bandeiras na abertura: em um olhar, catálogos de vários países */
+.flag-strip { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-1); margin-top: var(--s-1); }
+.flag-strip button { display: grid; place-items: center; width: 44px; height: 44px; border: 1.5px solid var(--rule); border-radius: var(--r-s); }
+.flag-strip .flag { font-size: 24px; }
+.flag-more { display: inline-flex; align-items: center; min-height: 44px; padding: 0 var(--s-2); font-weight: 700; font-size: 14px; color: var(--muted); }
+@media (hover: hover) {
+  .flag-strip button:hover { border-color: var(--text); background: var(--surface); }
+  .flag-more:hover { color: var(--text); }
+}
+
+.country-picker { display: grid; gap: var(--s-3); margin-top: var(--s-3); }
+.country-picker .countries { margin-top: 0; }
+.region-chips .chip { min-height: 44px; }
+
+/* ===== Guia de TV ===== */
+.guia-head { display: grid; gap: var(--s-2); padding-top: var(--s-5); }
+.guia-head h1 { font: 900 clamp(30px, 8vw, 48px)/1.05 var(--font-display); font-stretch: 118%; display: flex; align-items: center; gap: var(--s-2); }
+.guia-head .hero-actions { width: auto; }
+.guia-assuntos { position: sticky; top: 0; z-index: 2; margin-top: var(--s-6); padding: var(--s-2) 0; background: var(--bg); border-bottom: 1px solid var(--rule); }
+.guia-assuntos ul { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; padding-bottom: 2px; }
+.guia-assuntos .chip { white-space: nowrap; min-height: 44px; }
+.guia-sec { scroll-margin-top: 72px; }
+.guia-card[aria-current='true'] .tile-num { color: var(--accent-text); }
+.guia-prog { display: grid; gap: 4px; min-width: 0; font-size: 13px; color: var(--muted); }
+.guia-prog-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.guia-more { display: flex; flex-wrap: wrap; gap: var(--s-4); padding-top: var(--s-2); }
+.guia-more .link-btn { min-height: 44px; display: inline-flex; align-items: center; gap: 4px; }
+html[data-tv='on'] .flag-strip button { width: 64px; height: 64px; }
+html[data-tv='on'] .flag-strip .flag { font-size: 34px; }
+@media (max-width: 599px) {
+  .region-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-inline: calc(-1 * var(--s-4)); padding-inline: var(--s-4); }
+  .region-chips .chip { white-space: nowrap; flex: none; }
+}

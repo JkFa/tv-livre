@@ -55,7 +55,9 @@ export function useShortcuts(handlers: Handlers): string {
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
-      if (isEditable(e.target)) return;
+      // controle deslizante (volume): as setas e Home/End são dele; os outros atalhos (M, Espaço, F…) continuam valendo
+      const range = (e.target as HTMLInputElement | null)?.type === 'range';
+      if (range ? /^(Arrow|Home$|End$|Page)/.test(e.key) : isEditable(e.target)) return;
       if (document.querySelector('dialog[open]')) return;
       const key = e.key;
 

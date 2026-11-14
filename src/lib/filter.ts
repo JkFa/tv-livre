@@ -1,4 +1,5 @@
-import type { Channel, Status } from '../../shared/types.ts';
+import type { Channel } from '../../shared/types.ts';
+import { channelHealth, healthRank, type Health } from './health.ts';
 import { bomParaOuvir } from './modo.ts';
 import { caps, isPlayableHere } from './playback.ts';
 
@@ -6,7 +7,10 @@ export interface Filters {
   query: string;
   category: string;
   language: string;
-  status: Status | '';
+  /** Saúde do canal (ver health.ts): no ar, instável, não confirmado ou fora do ar. */
+  status: Health | '';
+  /** "Ocultar canais fora do ar" (começa desligado: por padrão eles ficam no fim da lista; a escolha fica salva). */
+  hideOffline: boolean;
   playableOnly: boolean;
   /** Só canais com programa que começou há pouco ou começa logo (precisa do guia). */
   startingNow: boolean;
@@ -16,7 +20,7 @@ export interface Filters {
   trending: boolean;
 }
 
-export const EMPTY_FILTERS: Filters = { query: '', category: '', language: '', status: '', playableOnly: false, startingNow: false, listen: false, trending: false };
+export const EMPTY_FILTERS: Filters = { query: '', category: '', language: '', status: '', hideOffline: false, playableOnly: false, startingNow: false, listen: false, trending: false };
 
 export function normalizeSearch(text: string): string {
   return text
@@ -37,24 +41,34 @@ function searchKey(ch: Channel): string {
   return k;
 }
 
-const STATUS_ORDER: Record<Status, number> = { online: 0, desconhecido: 1, offline: 2 };
-
+/** Ordem da lista com vários países: saúde (no ar → não confirmado → instável → fora), Free-TV primeiro e nome. */
 export function compareForDisplay(a: Channel, b: Channel): number {
   return (
-    STATUS_ORDER[a.status] - STATUS_ORDER[b.status] ||
+    healthRank(a, false) - healthRank(b, false) ||
     Number(b.sources[0] === 'free-tv') - Number(a.sources[0] === 'free-tv') ||
     a.name.localeCompare(b.name, 'pt-BR')
   );
 }
 
 /** Filtra e, havendo busca, ordena por relevância (prefixo > início de palavra > contém). */
-export function filterChannels(list: readonly Channel[], f: Filters, ctx: { startingNow?: (c: Channel) => boolean; assistindo?: ReadonlyMap<string, number> } = {}): Channel[] {
+/**
+ * Filtra e ordena. Sem busca: pela saúde (`rank`, ver healthRank: no ar no topo, canais que falharam neste navegador e fora do ar
+ * no fim), mantendo a ordem original dentro de cada faixa. Com busca: relevância primeiro, saúde depois.
+ * Nenhum canal sai da lista por causa do status, a não ser que o usuário peça (`hideOffline` ou o filtro de status).
+ */
+export function filterChannels(
+  list: readonly Channel[],
+  f: Filters,
+  ctx: { startingNow?: (c: Channel) => boolean; assistindo?: ReadonlyMap<string, number>; rank?: (c: Channel) => number } = {},
+): Channel[] {
   const q = normalizeSearch(f.query);
   const tokens = q ? q.split(' ') : [];
-  const scored: { ch: Channel; score: number }[] = [];
+  const scored: { ch: Channel; score: number; rank: number }[] = [];
+  const rank = ctx.rank ?? ((c: Channel) => healthRank(c, false));
 
   for (const ch of list) {
-    if (f.status && ch.status !== f.status) continue;
+    if (f.status && channelHealth(ch) !== f.status) continue;
+    if (f.hideOffline && f.status !== 'fora' && ch.status === 'offline') continue;
     if (f.category && !ch.categories.includes(f.category)) continue;
     if (f.language && !ch.languages.includes(f.language)) continue;
     if (f.playableOnly && !isPlayableHere(ch, caps())) continue;
@@ -67,12 +81,12 @@ export function filterChannels(list: readonly Channel[], f: Filters, ctx: { star
       if (!tokens.every((t) => key.includes(t))) continue;
       score = key.startsWith(` ${q}`) ? 3 : key.includes(` ${q}`) ? 2 : 1;
     }
-    scored.push({ ch, score });
+    scored.push({ ch, score, rank: rank(ch) });
   }
   if (f.trending && ctx.assistindo) {
     const n = (c: Channel) => ctx.assistindo?.get(`${c.country}/${c.id}`) ?? 0;
     scored.sort((a, b) => n(b.ch) - n(a.ch) || b.score - a.score);
-  } else if (tokens.length) scored.sort((a, b) => b.score - a.score);
+  } else scored.sort((a, b) => b.score - a.score || a.rank - b.rank);
   return scored.map((s) => s.ch);
 }
 

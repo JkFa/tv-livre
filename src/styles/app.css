@@ -131,7 +131,7 @@
 }
 
 /* dial: o controle remoto */
-.dial { display: grid; grid-template-columns: 72px 1fr 52px 52px 72px; align-items: stretch; height: 56px; border-bottom: 1px solid var(--rule); background: var(--surface); }
+.dial { display: grid; grid-template-columns: 64px 1fr 48px 48px 48px 64px; align-items: stretch; height: 56px; border-bottom: 1px solid var(--rule); background: var(--surface); }
 .dial button { display: flex; align-items: center; justify-content: center; gap: 2px; color: var(--text); }
 .dial button:hover:not(:disabled) { background: var(--raised); }
 .dial button:active:not(:disabled) { transform: translateY(1px); }
@@ -140,7 +140,7 @@
 .dial-now { display: flex; align-items: center; gap: var(--s-3); min-width: 0; padding: 0 var(--s-2); border-inline: 1px solid var(--rule); }
 .dial-now .num { font-size: 34px; color: var(--accent-text); }
 .dial-name { font-weight: 700; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dial-fav, .dial-share { border-right: 1px solid var(--rule); }
+.dial-fav, .dial-share, .dial-zap { border-right: 1px solid var(--rule); }
 .dial-fav.on { color: var(--accent-text); }
 .now { display: none; }
 
@@ -195,7 +195,7 @@
 @keyframes pulse { 50% { opacity: 0.45; } }
 
 .status { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 700; color: var(--muted); flex: none; }
-.status-online { color: var(--text); }
+.status-ok { color: var(--text); }
 .status svg { flex: none; }
 .badges { display: inline-flex; gap: 6px; }
 .badge { font-size: 12px; font-weight: 700; padding: 1px 6px; border: 1px solid var(--rule); border-radius: var(--r-s); color: var(--muted); }
@@ -241,7 +241,7 @@
 
 /* ===== tablet: mais ar na grade ===== */
 @media (min-width: 600px) {
-  .dial { grid-template-columns: 96px 1fr 60px 60px 96px; height: 60px; }
+  .dial { grid-template-columns: 96px 1fr 60px 60px 60px 96px; height: 60px; }
   .row { }
 }
 
@@ -270,7 +270,7 @@
   .osd-name { font-size: 20px; }
   .problem { padding: var(--s-6); gap: var(--s-3); }
   .problem h3 { font-size: 24px; }
-  .dial { grid-template-columns: 120px 1fr 64px 64px 120px; height: 64px; border: 1px solid var(--rule); border-top: 0; }
+  .dial { grid-template-columns: 120px 1fr 64px 64px 64px 120px; height: 64px; border: 1px solid var(--rule); border-top: 0; }
   .dial-now .num { font-size: 40px; }
   .dial-name { font-size: 18px; }
   .dial-side .num { font-size: 28px; }
@@ -420,3 +420,60 @@ html[data-tv='on'] .share-link { font-size: 22px; }
 html[data-tv='on'] .controle-sheet { font-size: 24px; }
 html[data-tv='on'] .controle-sheet .qr { width: min(420px, 50vh); }
 html[data-tv='on'] .controle-cod { font-size: 88px; }
+
+/* ===== volume: controle deslizante sempre visível (não depende de hover), alvo de toque de 44 px ===== */
+.vol {
+  flex: 0 1 88px; width: 88px; min-width: 48px; height: 44px; margin: 0 var(--s-1); padding: 0;
+  background: transparent; accent-color: #f1e9d8; cursor: pointer; touch-action: none;
+}
+.vol:focus-visible { outline: 2px solid var(--accent-text); outline-offset: -6px; }
+
+/* ===== mini-player: o MESMO player, reduzido a uma janela fixa enquanto se navega por outras telas =====
+   Celular: faixa acima da navegação inferior (nunca a cobre). Telas largas: janela no canto inferior direito.
+   Sem sombra difusa (DESIGN.md): a separação vem da borda. */
+.app[data-mini] { --mini-h: 86px; }
+.app[data-mini] .home, .app[data-mini] .page { padding-bottom: calc(var(--mini-h) + var(--s-6)); }
+.app[data-mini] .toast, .app[data-mini] .bar-update { bottom: calc(var(--nav-h, 0px) + var(--safe-b) + var(--mini-h) + var(--s-3)); }
+.workspace[data-mini='on'] {
+  position: fixed; z-index: 20; display: block; flex: none; height: auto; min-height: 0;
+  left: max(var(--s-2), var(--safe-l)); right: max(var(--s-2), var(--safe-r));
+  bottom: calc(var(--nav-h, 0px) + var(--safe-b) + var(--s-2));
+}
+.workspace[data-mini='on'] .tv { display: block; padding: 0; overflow: visible; }
+.player[data-mini='on'] {
+  flex-direction: row; align-items: stretch; width: 100%; max-width: none; height: auto; margin: 0;
+  background: #15110e; color: #f1e9d8; border: 1.5px solid var(--text); border-radius: var(--r-s); overflow: hidden;
+}
+.player[data-mini='on'] .stage { flex: none; width: 128px; height: auto; min-height: 72px; aspect-ratio: auto; border: 0; cursor: pointer; }
+/* painéis, vinheta e controles do player grande não cabem aqui: ficam só a imagem e um rótulo curto */
+.player[data-mini='on'] .stage > :not(video, audio, iframe, .mini-cover) { display: none; }
+.mini-cover {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); max-width: calc(100% - 8px);
+  padding: 2px 8px; background: rgb(21 17 14 / 0.86); color: #f1e9d8; font-size: 12px; font-weight: 700; white-space: nowrap; border-radius: var(--r-s);
+}
+.mini-bar { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; padding: 6px 2px 0 var(--s-2); }
+.mini-title { display: flex; align-items: baseline; gap: 6px; min-width: 0; padding-right: var(--s-2); font-size: 14px; font-weight: 700; line-height: 1.3; }
+.mini-title .num { flex: none; color: #a79e8e; }
+.mini-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mini-ctls { display: flex; align-items: center; margin-left: -10px; }
+.mini-ctls .ctl { width: 44px; height: 44px; flex: none; }
+.mini-ctls .vol { display: none; }
+@media (min-width: 600px) {
+  .app[data-mini] { --mini-h: 0px; }
+  .app[data-mini] .bar-update { right: calc(340px + var(--s-4) * 2); }
+  .workspace[data-mini='on'] { left: auto; width: 340px; right: max(var(--s-4), var(--safe-r)); bottom: calc(var(--nav-h, 0px) + var(--safe-b) + var(--s-4)); }
+  .player[data-mini='on'] { flex-direction: column; }
+  .player[data-mini='on'] .stage { width: 100%; min-height: 0; aspect-ratio: 16 / 9; }
+  .mini-bar { padding: var(--s-2) 2px 2px var(--s-3); }
+  .mini-ctls .vol { display: block; }
+}
+/* celular deitado: a janela encolhe para não tomar a tela baixa */
+@media (orientation: landscape) and (max-height: 520px) {
+  .workspace[data-mini='on'] { width: 240px; }
+  .workspace[data-mini='on'] .tv .player { height: auto; }
+  .workspace[data-mini='on'] .tv .stage { flex: none; aspect-ratio: 16 / 9; }
+}
+
+/* ===== filtro de saúde: 5 opções; em 360 px os rótulos longos quebram em duas linhas em vez de estourar ===== */
+.seg-saude button { padding: 4px 6px; line-height: 1.15; font-size: 13px; }
+.field-note { margin-top: var(--s-2); font-size: 13px; line-height: 1.35; color: var(--muted); }

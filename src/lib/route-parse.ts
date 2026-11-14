@@ -4,6 +4,8 @@ export type Route =
   | { name: 'home' }
   /** O aparelho: player + grade, sem canal escolhido. */
   | { name: 'watch' }
+  /** Guia de TV: canais do país por assunto, com região/país. */
+  | { name: 'guide' }
   | { name: 'about' }
   | { name: 'install' }
   /** O celular como controle remoto de outro TV Livre (`#/controle?s=…&k=…`). Os parâmetros ficam só no navegador. */
@@ -16,6 +18,7 @@ export function parseHash(hash: string): Route {
   const path = hash.replace(/^#/, '').split('?')[0] ?? '';
   const parts = path.split('/').filter(Boolean);
   if (parts[0] === 'canais') return { name: 'watch' };
+  if (parts[0] === 'guia') return { name: 'guide' };
   if (parts[0] === 'sobre') return { name: 'about' };
   if (parts[0] === 'instalar') return { name: 'install' };
   if (parts[0] === 'controle') return { name: 'remote' };

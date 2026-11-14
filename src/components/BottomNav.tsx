@@ -1,6 +1,6 @@
 import { Ellipsis, House, Search, Shuffle, Tv } from 'lucide-react';
 
-export type Section = 'home' | 'watch' | 'doc';
+export type Section = 'home' | 'watch' | 'guide' | 'doc';
 
 interface Props {
   section: Section;

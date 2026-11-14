@@ -5,6 +5,7 @@ import type { Channel, DataIndex } from '../shared/types.ts';
 import { About } from './components/About.tsx';
 import { BottomNav, type Section } from './components/BottomNav.tsx';
 import { ChannelList } from './components/ChannelList.tsx';
+import { GuidePage } from './components/GuidePage.tsx';
 import { Home } from './components/Home.tsx';
 import { ALL_COUNTRIES, FilterSheet, activeFilterCount } from './components/FilterSheet.tsx';
 import { InstallPage } from './components/InstallPage.tsx';
@@ -23,11 +24,14 @@ import { emAlta as calcularEmAlta, mapaMaisAssistidos } from './lib/presenca-ui.
 import { loadCountries, loadCountry, loadIndex } from './lib/data.ts';
 import { agora, comecandoAgora, nowSec, useEpgCountries, useEpgVersion, useGuideClock } from './lib/epg.ts';
 import { compareForDisplay, EMPTY_FILTERS, filterChannels, suggestAlternatives, type Filters } from './lib/filter.ts';
-import { categoryLabel, countryName, languageName, STATUS_LABELS } from './lib/labels.ts';
+import { categoryLabel, countryName, languageName, registerCountryFlags } from './lib/labels.ts';
 import { useFavorites, useRecents, type ChannelRef } from './lib/library.ts';
-import { buildNumbers, channelKey, findByNumber, formatNumber, pickShuffle, stepChannel } from './lib/lineup.ts';
+import { buildNumbers, channelKey, findByNumber, formatNumber, stepChannel } from './lib/lineup.ts';
+import { useZapear } from './lib/zapear.ts';
 import { getModoAudio, setModoAudio, type ModoAudio } from './lib/modo.ts';
-import { applyTheme, getLastChannel, getTheme, isDarkNow, setLastChannel, setTheme, type ThemePref } from './lib/prefs.ts';
+import { applyTheme, getHideOffline, getLastChannel, getTheme, isDarkNow, setHideOffline, setLastChannel, setTheme, type ThemePref } from './lib/prefs.ts';
+import { HEALTH_LABELS, healthRank } from './lib/health.ts';
+import { readLocalFailures } from './lib/local-failures.ts';
 import { captureInstallPrompt, useInstall, useOnline } from './lib/pwa.ts';
 import { channelHref, navigate, parseHash, useRoute } from './lib/router.ts';
 import { readString, writeString } from './lib/storage.ts';
@@ -57,7 +61,7 @@ export default function App() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [country, setCountry] = useState<string>(() => readString(COUNTRY_KEY) ?? 'BR');
   const [view, setView] = useState<View>('todos');
-  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+  const [filters, setFilters] = useState<Filters>(() => ({ ...EMPTY_FILTERS, hideOffline: getHideOffline() }));
   const [store, setStore] = useState<Record<string, Channel[]>>({});
   const [armed, setArmed] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -107,7 +111,10 @@ export default function App() {
   // ---- carga inicial: índice + contador de acessos ----
   useEffect(() => {
     loadIndex()
-      .then(setIndex)
+      .then((i) => {
+        registerCountryFlags(i.countries); // bandeiras só dos dados de origem
+        setIndex(i);
+      })
       .catch((e: unknown) => setLoadError(e instanceof Error ? e.message : 'Erro ao carregar os dados'));
     // visita real: conta uma vez por sessão; ambiente local, testes e automação só leem o total
     void (shouldCount() ? registerVisit() : readTotal()).then(setVisits);
@@ -123,6 +130,7 @@ export default function App() {
   const routeCountry = route.name === 'channel' ? route.country : null;
   const isHome = route.name === 'home';
   const isDoc = route.name === 'about' || route.name === 'install';
+  const isGuide = route.name === 'guide';
   // a tela inicial mostra a grade de um país só (nunca o mundo todo, mesmo que "todos os países" esteja salvo)
   const homeCountry = useMemo(() => {
     if (!index) return 'BR';
@@ -137,7 +145,8 @@ export default function App() {
   const needed = useMemo(() => {
     if (!index) return [] as string[];
     const set = new Set<string>();
-    if (isHome) {
+    if (isGuide) set.add(homeCountry);
+    else if (isHome) {
       set.add(homeCountry);
       recents.slice(0, 6).forEach((r) => set.add(r.country));
       favorites.slice(0, 6).forEach((r) => set.add(r.country));
@@ -152,13 +161,18 @@ export default function App() {
     if (routeCountry) set.add(routeCountry);
     if (last) set.add(last.country);
     return [...set];
-  }, [index, isHome, homeCountry, view, effectiveCountry, favorites, recents, routeCountry, last, paisesEmAlta]);
+  }, [index, isHome, isGuide, homeCountry, view, effectiveCountry, favorites, recents, routeCountry, last, paisesEmAlta]);
 
   useEpgCountries(needed, index?.epg);
   const epgVersion = useEpgVersion();
   const guideTick = useGuideClock([], filters.startingNow ? 60_000 : 3_600_000);
 
   const missingKey = needed.filter((c) => !(c in store)).join(',');
+  const zapear = useZapear();
+  const zapearRef = useRef(zapear);
+  useEffect(() => {
+    zapearRef.current = zapear;
+  });
   useEffect(() => {
     if (!missingKey) return;
     let cancelled = false;
@@ -171,7 +185,7 @@ export default function App() {
         setStore((s) => ({ ...s, ...grouped }));
         if (pendingZap.current && all.length) {
           pendingZap.current = false;
-          const pick = pickShuffle(all.filter((c) => c.country === (codes[0] ?? '')), null);
+          const pick = zapearRef.current(all.filter((c) => c.country === (codes[0] ?? '')), null);
           if (pick) tuneRef.current(pick);
         }
       })
@@ -197,26 +211,44 @@ export default function App() {
   }, [view, effectiveCountry, store, favorites, recents]);
 
   const maisAssistidos = useMemo(() => mapaMaisAssistidos(presenca), [presenca]);
+  // canais que não abriram neste navegador descem na lista. A ordem usa o registro do INÍCIO da sessão: uma falha agora
+  // não reordena a grade sob o dedo do usuário (vale da próxima vez que ele abrir o app)
+  const bootFailures = useMemo(() => readLocalFailures(), []);
+  const rankHere = useCallback((c: Channel) => healthRank(c, bootFailures.has(channelKey(c))), [bootFailures]);
+  useEffect(() => setHideOffline(filters.hideOffline), [filters.hideOffline]);
   // sem serviço de presença, "Mais assistidos agora" não existe: se estava marcado, deixa de valer
   const filtros = presenca || !filters.trending ? filters : { ...filters, trending: false };
   const visible = useMemo(
     () => {
       const t = nowSec();
-      return filterChannels(baseList, { ...filtros, query: deferredQuery }, { startingNow: (c) => !!comecandoAgora(c, t), assistindo: maisAssistidos });
+      return filterChannels(baseList, { ...filtros, query: deferredQuery }, { startingNow: (c) => !!comecandoAgora(c, t), assistindo: maisAssistidos, rank: rankHere });
     },
     // epgVersion e guideTick: o filtro "Começando agora" depende do guia carregado e do relógio
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [baseList, filtros, deferredQuery, epgVersion, guideTick, maisAssistidos],
+    [baseList, filtros, deferredQuery, epgVersion, guideTick, maisAssistidos, rankHere],
   );
 
-  const selected = useMemo(
+  const routeSelected = useMemo(
     () => (route.name === 'channel' ? (store[route.country]?.find((c) => c.id === route.id) ?? null) : null),
     [route, store],
   );
+  // ---- mini-player: quem sai do canal com o vídeo TOCANDO continua assistindo. O canal fica "ancorado" e o mesmo <Player>
+  // (o mesmo <video>) segue montado: na grade (#/canais) ele continua no lugar; nas outras telas vira uma janela fixa.
+  // Não vale no Modo TV nem transmitindo para a TV (lá sair do canal continua como antes).
+  const [docked, setDocked] = useState<Channel | null>(null);
+  const [prevRouteSelected, setPrevRouteSelected] = useState<Channel | null>(null);
+  if (routeSelected !== prevRouteSelected) {
+    setPrevRouteSelected(routeSelected);
+    if (routeSelected) setDocked(routeSelected);
+    else setDocked(route.name !== 'channel' && armed && playing && !tv && !cast.conectado ? prevRouteSelected : null);
+  }
+  const selected = routeSelected ?? (route.name !== 'channel' && !tv ? docked : null);
   const selectedKey = selected ? channelKey(selected) : null;
+  const isWorkspace = !isHome && !isDoc && !isGuide;
+  const miniOn = !isWorkspace && !!selected;
 
-  // "assistindo agora": só conta com um canal na tela E o vídeo realmente tocando (pausa, erro e sair do player = navegando)
-  const assistindoId = route.name === 'channel' && selected && playing ? selected.id : null;
+  // "assistindo agora": só conta com um canal na tela (ou no mini-player) E o vídeo realmente tocando (pausa, erro e sair do player = navegando)
+  const assistindoId = selected && playing ? selected.id : null;
   const assistindoPais = selected?.country ?? '';
   useEffect(() => {
     definirAssistindo(assistindoId ? { c: assistindoId, p: assistindoPais } : null);
@@ -257,18 +289,37 @@ export default function App() {
     },
     [zapList, selectedKey, tune, say, cast.conectado, numbers],
   );
-  const shuffle = useCallback(() => {
-    if (!index) return;
-    const pool = visible.length ? visible : baseList;
-    if (!pool.length && missingKey) {
-      pendingZap.current = true; // dados ainda carregando: sorteia assim que chegarem
-      return;
-    }
-    const castPool = (l: Channel[]) => (cast.conectado ? l.filter(podeTransmitir) : l);
-    const pick = pickShuffle(castPool(pool), selectedKey) ?? pickShuffle(castPool(baseList), selectedKey);
-    if (pick) tune(pick);
-    else say('Nenhum canal no ar com esses filtros. Tente limpar os filtros.');
-  }, [index, visible, baseList, missingKey, selectedKey, tune, say, cast.conectado]);
+  /** Mini-player: o canal sorteado entra na própria janelinha, sem trocar de tela. */
+  const dock = useCallback(
+    (c: Channel) => {
+      pushRecent(c);
+      setLastChannel({ id: c.id, country: c.country });
+      setDocked(c);
+    },
+    [pushRecent],
+  );
+  // Zapear: a regra de sorteio é uma só (lib/zapear.ts); aqui só se escolhe a lista e o que fazer com o canal sorteado
+  const shuffleIn = useCallback(
+    (list: readonly Channel[], fallback: readonly Channel[], go: (c: Channel) => void) => {
+      if (!index) return;
+      if (!list.length && !fallback.length && missingKey) {
+        pendingZap.current = true; // dados ainda carregando: sorteia assim que chegarem
+        return;
+      }
+      const extra = cast.conectado ? podeTransmitir : undefined; // transmitindo: só o que o Chromecast abre
+      const pick = zapear(list, selectedKey, extra) ?? zapear(fallback, selectedKey, extra);
+      if (pick) go(pick);
+      else say('Nenhum canal no ar que toque neste navegador. Tente limpar os filtros ou outro país.');
+    },
+    [index, missingKey, selectedKey, zapear, say, cast.conectado],
+  );
+  // a grade (ou, na home e no guia, o país mostrado)
+  const zapPool = useMemo(
+    () => (isHome || isGuide ? (store[homeCountry] ?? []) : visible.length ? visible : baseList),
+    [isHome, isGuide, store, homeCountry, visible, baseList],
+  );
+  const shuffle = useCallback(() => shuffleIn(zapPool, baseList, tune), [shuffleIn, zapPool, baseList, tune]);
+  const shuffleMini = useCallback(() => shuffleIn(zapPool, baseList, dock), [shuffleIn, zapPool, baseList, dock]);
 
   const tuneNumber = useCallback(
     (n: number) => {
@@ -464,14 +515,16 @@ export default function App() {
       ? staticRef === `${selected.country}/${selected.id}`
         ? `${selected.name} ao vivo — canal ${formatNumber(numbers.get(channelKey(selected)))} | TV Livre`
         : `${formatNumber(numbers.get(channelKey(selected)))} ${selected.name} — TV Livre`
-      : route.name === 'about'
+      : route.name === 'guide'
+        ? `Guia de TV: ${countryName(homeCountry)} — TV Livre`
+        : route.name === 'about'
         ? 'Sobre — TV Livre'
         : route.name === 'install'
           ? 'Instalar — TV Livre'
           : route.name === 'watch'
             ? 'Canais — TV Livre'
             : 'TV Livre — TV aberta ao vivo';
-  }, [selected, route.name, numbers]);
+  }, [selected, route.name, numbers, homeCountry]);
 
   const changeCountry = (code: string) => {
     setCountry(code);
@@ -515,7 +568,7 @@ export default function App() {
   );
   const openCategory = (id: string) => {
     if (effectiveCountry !== homeCountry) changeCountry(homeCountry);
-    setFilters({ ...EMPTY_FILTERS, category: id });
+    setFilters({ ...EMPTY_FILTERS, hideOffline: filters.hideOffline, category: id });
     setView('todos');
     navigate('#/canais');
   };
@@ -528,7 +581,8 @@ export default function App() {
   const chips: { label: string; clear: () => void }[] = [];
   if (filters.category) chips.push({ label: categoryLabel(filters.category), clear: () => setFilters({ ...filters, category: '' }) });
   if (filters.language) chips.push({ label: languageName(filters.language), clear: () => setFilters({ ...filters, language: '' }) });
-  if (filters.status) chips.push({ label: STATUS_LABELS[filters.status], clear: () => setFilters({ ...filters, status: '' }) });
+  if (filters.status) chips.push({ label: HEALTH_LABELS[filters.status], clear: () => setFilters({ ...filters, status: '' }) });
+  if (filters.hideOffline) chips.push({ label: 'Sem os fora do ar', clear: () => setFilters({ ...filters, hideOffline: false }) });
   if (filters.startingNow) chips.push({ label: 'Começando agora', clear: () => setFilters({ ...filters, startingNow: false }) });
   if (filters.listen) chips.push({ label: 'Bom para ouvir', clear: () => setFilters({ ...filters, listen: false }) });
   if (filtros.trending) chips.push({ label: 'Mais assistidos agora', clear: () => setFilters({ ...filters, trending: false }) });
@@ -564,7 +618,7 @@ export default function App() {
   const dataDate = index ? new Date(index.meta.generatedAt).toLocaleDateString('pt-BR', { dateStyle: 'long' }) : undefined;
   const showInstallBtn = install.kind === 'prompt' && !install.dismissed && !playing;
   const showIosBar = install.kind === 'ios' && !install.dismissed && !playing && !isDoc;
-  const section: Section = isHome ? 'home' : isDoc ? 'doc' : 'watch';
+  const section: Section = isHome ? 'home' : isDoc ? 'doc' : isGuide ? 'guide' : 'watch';
 
   const iosBar = showIosBar && (
     <div className="bar bar-install">
@@ -576,7 +630,7 @@ export default function App() {
   );
 
   return (
-    <div className="app" data-doc={isDoc ? '' : undefined}>
+    <div className="app" data-doc={isDoc ? '' : undefined} data-mini={miniOn ? 'on' : undefined}>
       <header className="topbar">
         <a className="brand" href="#/" aria-label="TV Livre, início">
           <Mark size={30} />
@@ -584,7 +638,8 @@ export default function App() {
         </a>
         <nav className="topnav" aria-label="Principal">
           <a href="#/" aria-current={isHome ? 'page' : undefined}>Início</a>
-          <a href="#/canais" aria-current={!isDoc && !isHome ? 'page' : undefined}>Canais</a>
+          <a href="#/canais" aria-current={isWorkspace ? 'page' : undefined}>Canais</a>
+          <a href="#/guia" aria-current={isGuide ? 'page' : undefined} data-testid="topnav-guia">Guia de TV</a>
           <a href="#/instalar" aria-current={route.name === 'install' ? 'page' : undefined}>Instalar</a>
           <a href="#/sobre" aria-current={route.name === 'about' ? 'page' : undefined}>Sobre</a>
         </nav>
@@ -665,6 +720,10 @@ export default function App() {
               changeCountry(ALL_COUNTRIES);
               navigate('#/canais');
             }}
+            onGuide={(code) => {
+              changeCountry(code);
+              navigate('#/guia');
+            }}
             onFavorites={() => {
               setView('favoritos');
               navigate('#/canais');
@@ -672,9 +731,26 @@ export default function App() {
             onTv={() => changeTvPref('ligado')}
           />
         </>
-      ) : (
-        <main className="workspace" id="conteudo">
-          <section className="tv" aria-label="Televisão">
+      ) : isGuide ? (
+        <GuidePage
+          index={index}
+          country={homeCountry}
+          channels={homeChannels}
+          loading={homeLoading}
+          numbers={numbers}
+          selectedKey={selectedKey}
+          onTune={tune}
+          onCountry={changeCountry}
+          onCategory={openCategory}
+          onZap={shuffle}
+        />
+      ) : null}
+
+      {/* O player mora SEMPRE neste mesmo lugar da árvore: trocar de tela não o desmonta (o stream não reinicia) e nunca há dois.
+          Fora da grade ele só existe se há um canal ancorado, e aí o CSS o transforma no mini-player (data-mini). */}
+      {index && !loadError && (isWorkspace || miniOn) && (
+        <div className="workspace" id={isWorkspace ? 'conteudo' : undefined} role={isWorkspace ? 'main' : undefined} data-mini={miniOn ? 'on' : undefined}>
+          <section className="tv" aria-label={miniOn ? 'Mini-player' : 'Televisão'}>
             {selectedMissing ? (
               <div className="player">
                 <div className="stage stage-idle" data-phase="idle">
@@ -714,11 +790,16 @@ export default function App() {
                 onMidia={setMidia}
                 modo={modo}
                 onModo={changeModo}
+                mini={miniOn}
+                onExpand={() => selected && navigate(channelHref(selected.country, selected.id))}
+                onClose={() => setDocked(null)}
+                onShuffle={miniOn ? shuffleMini : shuffle}
               />
             )}
-            {iosBar}
+            {isWorkspace && iosBar}
           </section>
 
+          {isWorkspace && (
           <aside className="grade" aria-label="Grade de canais" inert={tv && !guideShown} data-open={guideShown ? 'true' : undefined}>
             <div className="grade-head">
               <div className="seg seg-tabs" role="tablist" aria-label="Lista">
@@ -827,7 +908,8 @@ export default function App() {
               </footer>
             )}
           </aside>
-        </main>
+          )}
+        </div>
       )}
 
       {saidaVisivel && (

@@ -41,6 +41,12 @@ export interface OrgCountry {
   name: string;
   code: string;
   languages: string[];
+  flag?: string;
+}
+export interface OrgRegion {
+  code: string;
+  name: string;
+  countries: string[];
 }
 export interface OrgData {
   channels: OrgChannel[];
@@ -49,4 +55,6 @@ export interface OrgData {
   logos: OrgLogo[];
   blocklist: OrgBlock[];
   countries: OrgCountry[];
+  /** Opcional: sem ele os países só não ganham região. */
+  regions?: OrgRegion[];
 }
