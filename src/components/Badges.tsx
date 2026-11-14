@@ -1,4 +1,6 @@
+import { Globe } from 'lucide-react';
 import type { Channel } from '../../shared/types.ts';
+import { countryFlag, countryName } from '../lib/labels.ts';
 import { BLOCK_TEXT, browserBlock, channelHealth, HEALTH_LABELS, qualityLabel } from '../lib/health.ts';
 import { channelKey } from '../lib/lineup.ts';
 import { useLocalFailures } from '../lib/local-failures.ts';
@@ -63,6 +65,18 @@ export function ChannelBadges({ channel }: { channel: Channel }) {
       {channel.geo && (
         <span className="badge" title="Pode funcionar apenas dentro do país de origem">Por região</span>
       )}
+    </span>
+  );
+}
+
+/** Origem do canal: bandeira (dos dados de origem) + nome do país. Internacional ganha um globo; país sem bandeira na fonte, só o nome. */
+export function CountryTag({ code, short = false }: { code: string; short?: boolean }) {
+  const flag = countryFlag(code);
+  const name = countryName(code);
+  return (
+    <span className="country-tag" data-testid="pais-canal" data-pais={code} title={short ? name : undefined}>
+      {code === 'INT' ? <Globe size={13} aria-hidden="true" className="country-globe" /> : flag && <span className="flag" aria-hidden="true">{flag}</span>}
+      {short ? <span className="sr-only">{name}</span> : <span>{name}</span>}
     </span>
   );
 }

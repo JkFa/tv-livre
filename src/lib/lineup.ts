@@ -33,18 +33,6 @@ export function stepChannel(list: readonly Channel[], currentKey: string | null,
   return null;
 }
 
-/** Sorteia um canal no ar que toque no navegador; relaxa o critério se não houver nenhum. */
-export function pickShuffle(list: readonly Channel[], currentKey: string | null, rnd: () => number = Math.random): Channel | null {
-  const others = list.filter((c) => channelKey(c) !== currentKey);
-  const tiers = [
-    others.filter((c) => c.status === 'online' && isPlayableHere(c, caps())),
-    others.filter((c) => c.status === 'online'),
-    others.filter((c) => c.status !== 'offline' && isPlayableHere(c, caps())),
-  ];
-  const pool = tiers.find((t) => t.length > 0);
-  return pool ? (pool[Math.floor(rnd() * pool.length)] ?? null) : null;
-}
-
 export function findByNumber(list: readonly Channel[], numbers: Map<string, number>, n: number): Channel | null {
   return list.find((c) => numbers.get(channelKey(c)) === n) ?? null;
 }

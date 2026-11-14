@@ -61,7 +61,16 @@ export function languageName(code: string): string {
   }
 }
 
+/**
+ * Bandeiras vêm SÓ dos dados de origem (campo `flag` do iptv-org, gravado no index.json). Nada é derivado do código aqui:
+ * país sem bandeira na fonte (ou "INT") fica sem bandeira.
+ */
+const flags = new Map<string, string>();
+
+export function registerCountryFlags(list: readonly { code: string; flag?: string }[]): void {
+  for (const c of list) if (c.flag) flags.set(c.code, c.flag);
+}
+
 export function countryFlag(code: string): string {
-  if (!/^[A-Z]{2}$/.test(code)) return '🌐';
-  return String.fromCodePoint(...[...code].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
+  return flags.get(code) ?? '';
 }

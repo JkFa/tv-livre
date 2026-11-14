@@ -1,4 +1,5 @@
 import type { Channel, DataIndex, DataMeta, FacetCount, Source, Status, StreamKind } from '../../shared/types.ts';
+import type { CountryGeo } from '../../shared/regions.ts';
 import type { BuildStats } from './candidate.ts';
 import { freeTvCandidates, languagesByMainFeed } from './freetv.ts';
 import { deriveOrg, orgCandidates } from './iptvorg.ts';
@@ -81,7 +82,12 @@ export function sortChannels(list: Channel[]): Channel[] {
   );
 }
 
-export function buildIndex(channels: Channel[], generatedAt: string, sources: DataMeta['sources']): { index: DataIndex; byCountry: Map<string, Channel[]> } {
+export function buildIndex(
+  channels: Channel[],
+  generatedAt: string,
+  sources: DataMeta['sources'],
+  geo: ReadonlyMap<string, CountryGeo> = new Map(),
+): { index: DataIndex; byCountry: Map<string, Channel[]> } {
   const byCountry = new Map<string, Channel[]>();
   const cats = new Map<string, number>();
   const langs = new Map<string, number>();
@@ -106,11 +112,16 @@ export function buildIndex(channels: Channel[], generatedAt: string, sources: Da
 
   const index: DataIndex = {
     meta: { schema: 1, generatedAt, total: channels.length, bySource, byStatus, byKind, inBothSources: inBoth, sources },
-    countries: [...byCountry].map(([code, list]) => ({
-      code,
-      count: list.length,
-      online: list.filter((c) => c.status === 'online').length,
-    })).sort((a, b) => b.count - a.count || a.code.localeCompare(b.code)),
+    countries: [...byCountry].map(([code, list]) => {
+      const g = geo.get(code);
+      return {
+        code,
+        count: list.length,
+        online: list.filter((c) => c.status === 'online').length,
+        ...(g?.flag ? { flag: g.flag } : {}),
+        ...(g?.regions.length ? { regions: g.regions } : {}),
+      };
+    }).sort((a, b) => b.count - a.count || a.code.localeCompare(b.code)),
     categories: facet(cats),
     languages: facet(langs),
   };

@@ -10,12 +10,14 @@
  * Termina com código 1 (e NÃO grava nada) se alguma fonte estiver fora do ar ou
  * se o total de canais cair mais de 50% em relação à última publicação.
  */
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import type { Channel, DataMeta, HealthEntry, HealthFile, Status } from '../shared/types.ts';
+import { countryGeo } from '../shared/regions.ts';
 import { fetchJson, fetchText } from './lib/fetch-source.ts';
 import type { OrgData } from './lib/iptvorg-types.ts';
 import type { Removals } from './lib/removals.ts';
+import { canonCountry } from './lib/normalize.ts';
 import { assemble, buildIndex, sortChannels, toPublicChannel } from './lib/pipeline.ts';
 import {
   DEFAULT_PROBE,
@@ -58,6 +60,7 @@ async function loadSources(): Promise<{ freeTv: string; org: OrgData }> {
       org: {
         channels: j('channels'), feeds: j('feeds'), streams: j('streams'),
         logos: j('logos'), blocklist: j('blocklist'), countries: j('countries'),
+        regions: existsSync(join(orgDir, 'regions.json')) ? j('regions') : undefined,
       },
     };
   }
@@ -71,7 +74,12 @@ async function loadSources(): Promise<{ freeTv: string; org: OrgData }> {
     fetchJson<OrgData['blocklist']>(`${ORG_API}/blocklist.json`),
     fetchJson<OrgData['countries']>(`${ORG_API}/countries.json`),
   ]);
-  return { freeTv, org: { channels, feeds, streams, logos, blocklist, countries } };
+  // Regiões só agrupam países na interface: se a API falhar, publica sem elas.
+  const regions = await fetchJson<NonNullable<OrgData['regions']>>(`${ORG_API}/regions.json`).catch((err: unknown) => {
+    log(`aviso: regiões indisponíveis (${err instanceof Error ? err.message : err}); os países ficam sem região`);
+    return undefined;
+  });
+  return { freeTv, org: { channels, feeds, streams, logos, blocklist, countries, regions } };
 }
 
 /** Validação mínima: uma fonte "viva" mas vazia/quebrada também deve barrar a publicação. */
@@ -200,7 +208,11 @@ async function main() {
   const { index, byCountry } = buildIndex(sortChannels(channels), generatedAt, [
     { name: 'Free-TV/IPTV', url: 'https://github.com/Free-TV/IPTV' },
     { name: 'iptv-org/iptv', url: 'https://github.com/iptv-org/iptv' },
-  ]);
+  ], countryGeo({
+    // mesma unificação de códigos dos canais (o iptv-org chama o Reino Unido de "UK")
+    countries: org.countries.map((c) => ({ ...c, code: canonCountry(c.code) })),
+    regions: (org.regions ?? []).map((r) => ({ ...r, countries: r.countries.map(canonCountry) })),
+  }));
 
   const out = resolve(opt('out') ?? 'public/data');
   rmSync(out, { recursive: true, force: true });

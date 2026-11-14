@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Airplay, Cast, ChevronLeft, ChevronRight, Download, ExternalLink, Maximize, Maximize2, Minimize, Pause, PictureInPicture2, Play, Power,
-  RotateCw, ScreenShare, Share2, ShieldCheck, Star, Volume1, Volume2, VolumeX, WifiOff, X,
+  RotateCw, ScreenShare, Share2, ShieldCheck, Shuffle, Star, Volume1, Volume2, VolumeX, WifiOff, X,
 } from 'lucide-react';
 import { MIN_PUBLICO, textoCanal } from '../lib/presenca-ui.ts';
 import type { Channel } from '../../shared/types.ts';
@@ -16,7 +16,7 @@ import { ConsumoSessao, conexaoFraca, dicaDadosDispensada, dispensarDicaDados, t
 import { getTimerPadrao, type OpcaoTimer } from '../lib/timer.ts';
 import { useSleepTimer } from '../lib/useSleepTimer.ts';
 import { useAirPlay, useRemotePlayback } from '../lib/transporte.ts';
-import { categoryLabel, countryFlag, countryName } from '../lib/labels.ts';
+import { categoryLabel, countryName } from '../lib/labels.ts';
 import { CAUSAS_CAST, CAUSES, UNSUPPORTED, type UnsupportedWhy } from '../lib/messages.ts';
 import { getMuted, getVolume, markSwipeHintSeen, setMuted as saveMuted, setVolume as saveVolume, swipeHintSeen } from '../lib/prefs.ts';
 import { clearLocalFailure, recordLocalFailure } from '../lib/local-failures.ts';
@@ -25,7 +25,7 @@ import { caps, isPlayableHere, unsupportedReason, type Engine } from '../lib/pla
 import { isTvNow } from '../lib/tvmode.ts';
 import { canAllowInsecure, downloadM3u, platform, siteSettingsAddress, vlcHref } from '../lib/vlc.ts';
 import { useMediaSession, useWakeLock } from '../lib/media.ts';
-import { ChannelBadges, StatusMark } from './Badges.tsx';
+import { ChannelBadges, CountryTag, StatusMark } from './Badges.tsx';
 import { CastPanel, type CastErro } from './CastPanel.tsx';
 import { ChannelLogo } from './ChannelLogo.tsx';
 import { GuideStrip } from './Guide.tsx';
@@ -79,6 +79,8 @@ interface Props {
   mini?: boolean;
   onExpand?: () => void;
   onClose?: () => void;
+  /** Zapear (sorteio único de lib/zapear.ts); no mini-player o sorteado entra na própria janela. */
+  onShuffle?: () => void;
 }
 
 /** Soma dos bytes reais dos trechos baixados nesta sessão (vale para todos os canais até recarregar a página). */
@@ -739,6 +741,11 @@ export function Player(props: Props) {
               </>
             )}
             <span className="ctl-spacer" />
+            {props.onShuffle && (
+              <button type="button" className="ctl" onClick={props.onShuffle} aria-label="Zapear: sortear outro canal aqui no mini-player" title="Zapear" data-testid="mini-zapear">
+                <Shuffle size={20} />
+              </button>
+            )}
             <button type="button" className="ctl" onClick={props.onExpand} aria-label={`Expandir: voltar ao canal ${props.number} ${channel.name}`} title="Expandir" data-testid="mini-expandir">
               <Maximize2 size={20} />
             </button>
@@ -776,7 +783,7 @@ export function Player(props: Props) {
         <div className="now-body">
           <h2>{channel.name}</h2>
           <p className="now-meta">
-            <span>{countryFlagText(channel.country)}</span>
+            <CountryTag code={channel.country} />
             {channel.categories[0] && <span>{categoryLabel(channel.categories[0])}</span>}
             <StatusMark channel={channel} withText />
             <ChannelBadges channel={channel} />
@@ -847,7 +854,6 @@ function VolumeControl({ volume, muted, onToggle, onSlider }: { volume: number; 
   );
 }
 
-const countryFlagText = (c: string) => `${countryFlag(c)} ${countryName(c)}`.trim();
 
 /** Abre o canal no VLC sem copiar nada: celular por link direto; computador por um .m3u de um clique. */
 function VlcOpen({ channel, variant = 'accent' }: { channel: Channel; variant?: 'accent' | 'plain' }) {
@@ -1038,7 +1044,7 @@ function Problem({ title, text, detail, tone, icon, actions, extra, suggestions,
   );
 }
 
-function Dial({ channel, number, prev, next, onZap, isFavorite, onToggleFavorite, onShare }: Props & { channel: Channel }) {
+function Dial({ channel, number, prev, next, onZap, isFavorite, onToggleFavorite, onShare, onShuffle }: Props & { channel: Channel }) {
   return (
     <div className="dial" role="group" aria-label="Controle de canais">
       <button type="button" className="dial-side" onClick={() => onZap(-1)} aria-label={prev ? `Canal anterior: ${prev.number} ${prev.name}` : 'Canal anterior'} disabled={!prev}>
@@ -1054,6 +1060,9 @@ function Dial({ channel, number, prev, next, onZap, isFavorite, onToggleFavorite
       </button>
       <button type="button" className="dial-share" onClick={onShare} aria-label="Compartilhar este canal" title="Compartilhar (S)" data-testid="share-btn">
         <Share2 size={20} aria-hidden="true" />
+      </button>
+      <button type="button" className="dial-zap" onClick={onShuffle} disabled={!onShuffle} aria-label="Zapear: sortear um canal no ar" title="Zapear (Z)" data-testid="player-zapear">
+        <Shuffle size={20} aria-hidden="true" />
       </button>
       <button type="button" className="dial-side" onClick={() => onZap(1)} aria-label={next ? `Próximo canal: ${next.number} ${next.name}` : 'Próximo canal'} disabled={!next}>
         <span className="num">{next?.number ?? ''}</span>

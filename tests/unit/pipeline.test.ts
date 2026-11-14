@@ -135,6 +135,15 @@ describe('índice por país', () => {
     expect(byCountry.get('BR')?.[0]?.id).toBe('a'); // online primeiro
   });
 
+  it('grava bandeira e regiões da fonte só quando existem', () => {
+    const ch: Channel = { id: 'a', name: 'a', country: 'BR', categories: [], languages: [], url: 'https://x/a', kind: 'hls', status: 'online', sources: ['iptv-org'] };
+    const { index } = buildIndex([ch, { ...ch, id: 'b', url: 'https://x/b', country: 'INT' }], '2026-01-01T00:00:00Z', [], new Map([['BR', { flag: '🇧🇷', regions: ['SOUTHAM'] }]]));
+    expect(index.countries).toEqual([
+      { code: 'BR', count: 1, online: 1, flag: '🇧🇷', regions: ['SOUTHAM'] },
+      { code: 'INT', count: 1, online: 1 },
+    ]);
+  });
+
   it('toPublicChannel remove campos internos', () => {
     const [m] = mergeCandidates([cand({ name: 'X', url: 'https://x.com/a.m3u8', probeHeaders: { userAgent: 'u' } })]).channels;
     const pub = toPublicChannel(m!, 'online');

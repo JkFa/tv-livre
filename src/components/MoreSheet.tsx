@@ -1,4 +1,4 @@
-import { Download, Info, Keyboard, Smartphone, Tv } from 'lucide-react';
+import { CalendarDays, Download, Info, Keyboard, Smartphone, Tv } from 'lucide-react';
 import { MODOS, ROTULO_MODO, type ModoAudio } from '../lib/modo.ts';
 import type { ThemePref } from '../lib/prefs.ts';
 import type { TvPref } from '../lib/tvmode.ts';
@@ -25,6 +25,11 @@ export function MoreSheet({ open, onClose, theme, onTheme, onShortcuts, onSmartT
   return (
     <Sheet id="mais" open={open} onClose={onClose} title="Mais">
       <ul className="menu">
+        <li>
+          <a href="#/guia" onClick={onClose} data-testid="more-guia">
+            <CalendarDays size={22} aria-hidden="true" /> Guia de TV por país e assunto
+          </a>
+        </li>
         <li>
           <a href="#/instalar" onClick={onClose}>
             <Download size={22} aria-hidden="true" /> Instalar o aplicativo

@@ -73,8 +73,9 @@ export function About({ visits }: { visits: number | null }) {
         </li>
         <li>
           <a href="https://github.com/iptv-org/iptv" target="_blank" rel="noopener noreferrer">iptv-org/iptv</a>: coleção
-          colaborativa de canais públicos e seu banco de metadados (países, categorias, idiomas, logos), em domínio
-          público (Unlicense).
+          colaborativa de canais públicos e seu banco de metadados (países, bandeiras, regiões, categorias, idiomas, logos), em
+          domínio público (Unlicense). As regiões do Guia de TV são as dessa fonte: um país pode estar em duas (Rússia e Turquia,
+          por exemplo, em Europa e Ásia) e alguns não estão em nenhuma (&quot;Sem região na fonte&quot;).
         </li>
         <li>
           <a href="https://github.com/iptv-org/epg" target="_blank" rel="noopener noreferrer">iptv-org/epg</a>: coletor do guia

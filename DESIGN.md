@@ -61,12 +61,15 @@ Ambas OFL, autohospedadas, subset latino, `font-display: swap` com fallback ajus
 
 | Componente | Notas |
 |---|---|
-| **Grade (`Lineup`)** | Virtualizada. Linha de 60 px: número condensado (30 px), nome, subtítulo (categoria · país), status. Canal sintonizado = bloco de número preenchido com o acento. Régua de 1 px, sem cartões. |
+| **Grade (`Lineup`)** | Virtualizada. Linha de 60 px: número condensado (30 px), nome, status, origem (bandeira; com o nome do país quando a lista mistura países) e categoria. Canal sintonizado = bloco de número preenchido com o acento. Régua de 1 px, sem cartões. |
 | **Player** | 16:9, sempre visível. Estados: espera (tela de ajuste), conectando, no ar, reconectando, erro, incompatível, embed. Controles próprios (sem `controls` nativo) para não brigar com os gestos. |
 | **Volume** | Botão de som + controle deslizante nativo (`<input type="range">`, 0–100) na barra de controles, na cor do texto do palco (o acento fica reservado). Alvo de 44 px de altura, foco visível. |
 | **Mini-player** | O próprio player reduzido: bloco escuro como o palco, borda sólida (sem sombra), imagem + número e nome + tocar/pausar, som, expandir, fechar (44 px). Celular: faixa de ~86 px acima da navegação inferior; ≥ 600 px: janela de 340 px no canto inferior direito. Aparece e some sem animação. |
 | **Vinheta (OSD)** | Bloco sólido (sem vidro) no canto: número enorme + nome. Entra por `transform` em 160 ms, some em ~2,4 s. Digitar números mostra o que foi digitado. |
-| **Dial** | Faixa "‹ 06 · **07 Nome** · 08 ›" abaixo do player: o controle remoto. Alvos de 56 px. |
+| **Dial** | Faixa "‹ 06 · **07 Nome** · ★ · compartilhar · zapear · 08 ›" abaixo do player: o controle remoto. Alvos de 48–64 px. |
+| **Origem (bandeira + país)** | Bandeira emoji **dos dados** (iptv-org) + nome do país em texto `muted`; nas listas de um país só, só a bandeira (o nome vai para leitores de tela). Internacional = ícone de globo. Sem cor própria. |
+| **Seletor região → país** | Chips de região (`aria-pressed`, contagem em `muted`; no celular rolam na horizontal) e a grade de países já existente, com a bandeira no lugar do código. |
+| **Guia de TV** | Página tipográfica como a home: título com bandeira, seletor de países, faixa de assuntos fixa no topo ao rolar, seções com a mesma `tile` da home (número, nome, programa, status). Nada de cartões com sombra. |
 | **Navegação inferior** | Início · Canais · **Zapear** (central, acento) · Buscar · Mais. Só abaixo de 960 px. |
 | **Folha (`Sheet`)** | `<dialog>` nativo (foco preso, Esc, fundo inerte) ancorada embaixo. Filtros, menu "Mais", atalhos. |
 | **Chips de filtro** | Retângulos de canto pequeno, removíveis, com "Limpar tudo". |

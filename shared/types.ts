@@ -52,6 +52,10 @@ export interface CountrySummary {
   code: string;
   count: number;
   online: number;
+  /** Bandeira (emoji) do iptv-org (countries.json). Ausente = a fonte não tem. */
+  flag?: string;
+  /** Regiões do iptv-org (regions.json) a que o país pertence, entre as de shared/regions.ts. Pode ter mais de uma ou nenhuma. */
+  regions?: string[];
 }
 
 export interface FacetCount {

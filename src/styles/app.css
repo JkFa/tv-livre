@@ -131,7 +131,7 @@
 }
 
 /* dial: o controle remoto */
-.dial { display: grid; grid-template-columns: 72px 1fr 52px 52px 72px; align-items: stretch; height: 56px; border-bottom: 1px solid var(--rule); background: var(--surface); }
+.dial { display: grid; grid-template-columns: 64px 1fr 48px 48px 48px 64px; align-items: stretch; height: 56px; border-bottom: 1px solid var(--rule); background: var(--surface); }
 .dial button { display: flex; align-items: center; justify-content: center; gap: 2px; color: var(--text); }
 .dial button:hover:not(:disabled) { background: var(--raised); }
 .dial button:active:not(:disabled) { transform: translateY(1px); }
@@ -140,7 +140,7 @@
 .dial-now { display: flex; align-items: center; gap: var(--s-3); min-width: 0; padding: 0 var(--s-2); border-inline: 1px solid var(--rule); }
 .dial-now .num { font-size: 34px; color: var(--accent-text); }
 .dial-name { font-weight: 700; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dial-fav, .dial-share { border-right: 1px solid var(--rule); }
+.dial-fav, .dial-share, .dial-zap { border-right: 1px solid var(--rule); }
 .dial-fav.on { color: var(--accent-text); }
 .now { display: none; }
 
@@ -241,7 +241,7 @@
 
 /* ===== tablet: mais ar na grade ===== */
 @media (min-width: 600px) {
-  .dial { grid-template-columns: 96px 1fr 60px 60px 96px; height: 60px; }
+  .dial { grid-template-columns: 96px 1fr 60px 60px 60px 96px; height: 60px; }
   .row { }
 }
 
@@ -270,7 +270,7 @@
   .osd-name { font-size: 20px; }
   .problem { padding: var(--s-6); gap: var(--s-3); }
   .problem h3 { font-size: 24px; }
-  .dial { grid-template-columns: 120px 1fr 64px 64px 120px; height: 64px; border: 1px solid var(--rule); border-top: 0; }
+  .dial { grid-template-columns: 120px 1fr 64px 64px 64px 120px; height: 64px; border: 1px solid var(--rule); border-top: 0; }
   .dial-now .num { font-size: 40px; }
   .dial-name { font-size: 18px; }
   .dial-side .num { font-size: 28px; }
