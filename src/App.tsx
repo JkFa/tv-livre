@@ -23,11 +23,13 @@ import { emAlta as calcularEmAlta, mapaMaisAssistidos } from './lib/presenca-ui.
 import { loadCountries, loadCountry, loadIndex } from './lib/data.ts';
 import { agora, comecandoAgora, nowSec, useEpgCountries, useEpgVersion, useGuideClock } from './lib/epg.ts';
 import { compareForDisplay, EMPTY_FILTERS, filterChannels, suggestAlternatives, type Filters } from './lib/filter.ts';
-import { categoryLabel, countryName, languageName, STATUS_LABELS } from './lib/labels.ts';
+import { categoryLabel, countryName, languageName } from './lib/labels.ts';
 import { useFavorites, useRecents, type ChannelRef } from './lib/library.ts';
 import { buildNumbers, channelKey, findByNumber, formatNumber, pickShuffle, stepChannel } from './lib/lineup.ts';
 import { getModoAudio, setModoAudio, type ModoAudio } from './lib/modo.ts';
-import { applyTheme, getLastChannel, getTheme, isDarkNow, setLastChannel, setTheme, type ThemePref } from './lib/prefs.ts';
+import { applyTheme, getHideOffline, getLastChannel, getTheme, isDarkNow, setHideOffline, setLastChannel, setTheme, type ThemePref } from './lib/prefs.ts';
+import { HEALTH_LABELS, healthRank } from './lib/health.ts';
+import { readLocalFailures } from './lib/local-failures.ts';
 import { captureInstallPrompt, useInstall, useOnline } from './lib/pwa.ts';
 import { channelHref, navigate, parseHash, useRoute } from './lib/router.ts';
 import { readString, writeString } from './lib/storage.ts';
@@ -57,7 +59,7 @@ export default function App() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [country, setCountry] = useState<string>(() => readString(COUNTRY_KEY) ?? 'BR');
   const [view, setView] = useState<View>('todos');
-  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+  const [filters, setFilters] = useState<Filters>(() => ({ ...EMPTY_FILTERS, hideOffline: getHideOffline() }));
   const [store, setStore] = useState<Record<string, Channel[]>>({});
   const [armed, setArmed] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -197,16 +199,21 @@ export default function App() {
   }, [view, effectiveCountry, store, favorites, recents]);
 
   const maisAssistidos = useMemo(() => mapaMaisAssistidos(presenca), [presenca]);
+  // canais que não abriram neste navegador descem na lista. A ordem usa o registro do INÍCIO da sessão: uma falha agora
+  // não reordena a grade sob o dedo do usuário (vale da próxima vez que ele abrir o app)
+  const bootFailures = useMemo(() => readLocalFailures(), []);
+  const rankHere = useCallback((c: Channel) => healthRank(c, bootFailures.has(channelKey(c))), [bootFailures]);
+  useEffect(() => setHideOffline(filters.hideOffline), [filters.hideOffline]);
   // sem serviço de presença, "Mais assistidos agora" não existe: se estava marcado, deixa de valer
   const filtros = presenca || !filters.trending ? filters : { ...filters, trending: false };
   const visible = useMemo(
     () => {
       const t = nowSec();
-      return filterChannels(baseList, { ...filtros, query: deferredQuery }, { startingNow: (c) => !!comecandoAgora(c, t), assistindo: maisAssistidos });
+      return filterChannels(baseList, { ...filtros, query: deferredQuery }, { startingNow: (c) => !!comecandoAgora(c, t), assistindo: maisAssistidos, rank: rankHere });
     },
     // epgVersion e guideTick: o filtro "Começando agora" depende do guia carregado e do relógio
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [baseList, filtros, deferredQuery, epgVersion, guideTick, maisAssistidos],
+    [baseList, filtros, deferredQuery, epgVersion, guideTick, maisAssistidos, rankHere],
   );
 
   const routeSelected = useMemo(
@@ -528,7 +535,7 @@ export default function App() {
   );
   const openCategory = (id: string) => {
     if (effectiveCountry !== homeCountry) changeCountry(homeCountry);
-    setFilters({ ...EMPTY_FILTERS, category: id });
+    setFilters({ ...EMPTY_FILTERS, hideOffline: filters.hideOffline, category: id });
     setView('todos');
     navigate('#/canais');
   };
@@ -541,7 +548,8 @@ export default function App() {
   const chips: { label: string; clear: () => void }[] = [];
   if (filters.category) chips.push({ label: categoryLabel(filters.category), clear: () => setFilters({ ...filters, category: '' }) });
   if (filters.language) chips.push({ label: languageName(filters.language), clear: () => setFilters({ ...filters, language: '' }) });
-  if (filters.status) chips.push({ label: STATUS_LABELS[filters.status], clear: () => setFilters({ ...filters, status: '' }) });
+  if (filters.status) chips.push({ label: HEALTH_LABELS[filters.status], clear: () => setFilters({ ...filters, status: '' }) });
+  if (filters.hideOffline) chips.push({ label: 'Sem os fora do ar', clear: () => setFilters({ ...filters, hideOffline: false }) });
   if (filters.startingNow) chips.push({ label: 'Começando agora', clear: () => setFilters({ ...filters, startingNow: false }) });
   if (filters.listen) chips.push({ label: 'Bom para ouvir', clear: () => setFilters({ ...filters, listen: false }) });
   if (filtros.trending) chips.push({ label: 'Mais assistidos agora', clear: () => setFilters({ ...filters, trending: false }) });

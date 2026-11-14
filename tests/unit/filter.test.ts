@@ -31,7 +31,7 @@ describe('busca e filtros', () => {
   it('filtra por categoria, idioma e status', () => {
     expect(filterChannels(list, { ...EMPTY_FILTERS, category: 'news' }).map((c) => c.id)).toEqual(['globonews', 'bbc']);
     expect(filterChannels(list, { ...EMPTY_FILTERS, language: 'eng' }).map((c) => c.id)).toEqual(['bbc']);
-    expect(filterChannels(list, { ...EMPTY_FILTERS, status: 'offline' }).map((c) => c.id)).toEqual(['sp']);
+    expect(filterChannels(list, { ...EMPTY_FILTERS, status: 'fora' }).map((c) => c.id)).toEqual(['sp']);
   });
   it('"só os que tocam no navegador" tira HTTP e YouTube sem embed', () => {
     expect(filterChannels(list, { ...EMPTY_FILTERS, playableOnly: true }).map((c) => c.id)).toEqual(['globo', 'globonews', 'sp']);

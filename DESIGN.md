@@ -23,7 +23,7 @@ Evitamos a nostalgia caricata (nada de TV de tubo, chuvisco ou VHS). A única re
 - **Sem logos na grade.** Logos de canais vêm de dezenas de servidores de terceiros, quebram, têm fundos incompatíveis e
   vazam o acesso do usuário a cada rolagem. Na lista o número e o nome bastam. O logo aparece só no canal aberto.
 - **Sem cartões.** A grade é uma tabela tipográfica: régua fina, número grande à esquerda, nome ao lado.
-- **Sem cor de status.** Status por forma (círculo cheio, vazado, riscado) e por texto. O acento fica reservado.
+- **Sem cor de status.** Status por forma (círculo cheio = no ar, meio cheio = instável, vazado = não confirmado, riscado = fora do ar) e por texto. O acento fica reservado. Selos de texto (*Não toca no navegador*, *Não abriu aqui*, qualidade como `1080p`) são retângulos de borda fina, sem cor própria.
 
 ## Tokens
 

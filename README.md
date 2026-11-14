@@ -301,7 +301,8 @@ Em navegadores de TV (Samsung/Tizen, LG/webOS, Google TV, Fire TV, Chromecast) o
 | Duplicatas | Por URL (http/https tratados como iguais) e por *nome normalizado + país*. **Free-TV tem prioridade**; a origem de cada canal fica em `sources`. |
 | Adultos | Excluídos por `is_nsfw`, categoria `xxx`, blocklist do iptv-org, URLs de canais adultos e palavras-chave. |
 | Tipo do link | `hls` (HTTPS reproduzível), `youtube`, `http` (o site tenta HTTPS e, se o usuário liberou, HTTP puro) ou `other`. |
-| Status | `online`, `offline` ou `desconhecido` (no app: *No ar*, *Fora do ar*, *Não confirmado*). **Uma falha isolada nunca remove nem derruba um canal.** |
+| Status | `online`, `offline` ou `desconhecido`, mais `fails` (falhas seguidas). No app: *No ar*, *Instável* (1–2 falhas seguidas), *Fora do ar* e *Não confirmado* (`src/lib/health.ts`). **Uma falha isolada nunca remove nem derruba um canal.** |
+| Medidas | `checked` (último teste, minutos desde a época), `latency` (ms até a resposta, medido nos EUA: só uma dica), `resolution` (maior variante da lista HLS, ex. `1080p`) e `httpsOk` (link HTTP que também responde por HTTPS com CORS: toca no navegador sem conteúdo misto). Só aparecem quando há valor. |
 | Saída | `public/data/index.json` (leve) + `public/data/countries/<PAÍS>.json` + `health.json`. A página só baixa o índice e o país escolhido. |
 
 **Número do canal.** É a posição estável do canal na grade do país (Free-TV primeiro, depois ordem alfabética), independente de
@@ -310,6 +311,16 @@ filtros e de status; só muda quando a lista de canais muda.
 **Regras de status.** Sucesso → `online`. Falha certa (404/410, DNS, certificado) → `offline`, mas um canal que estava online
 só cai para `desconhecido` na primeira falha. Falha ambígua (timeout, 403, 5xx, conteúdo estranho, comum em bloqueio
 geográfico, já que o teste roda em servidores fora do Brasil) → `desconhecido`, e só vira `offline` após 3 execuções seguidas.
+Links HTTP são testados também na versão HTTPS (o player tenta essa versão primeiro).
+
+**Saúde no site (`src/lib/health.ts`, `useHealth`).** Uma única regra alimenta os selos, a ordem da lista e o filtro (e, depois,
+o zapear e o guia). A lista ordena *no ar → não confirmado → instável → não abriu aqui → fora do ar*, mantendo a ordem de antes
+dentro de cada faixa; **nenhum canal some por causa do status**. O filtro *Ocultar canais fora do ar* começa **desligado** e a
+escolha fica salva (`tvlivre:ocultar-fora`). Canais que o navegador não consegue tocar aqui (HTTP sem HTTPS numa página segura,
+sem CORS e sem HLS nativo, cabeçalhos exigidos, outro formato) levam o selo *Não toca no navegador*, esteja o canal no ar ou não.
+**Sinal local:** um canal que deu erro ao tocar neste navegador fica em `tvlivre:falhas` por 7 dias, ganha o selo *Não abriu
+aqui* e desce na lista a partir da próxima sessão; se tocar de novo, sai do registro. Sem internet não conta. Nada disso sai do
+aparelho: não é métrica de audiência.
 O pipeline também detecta se o servidor envia cabeçalhos **CORS**; sem eles o navegador não consegue tocar o canal e o site avisa.
 
 **Salvaguardas.** O pipeline termina com erro, e portanto **não publica**, se uma fonte estiver fora do ar/inconsistente ou se o
@@ -423,7 +434,7 @@ Rotas usam *hash* (`#/` tela inicial, `#/canais` player + grade, `#/canal/BR/<id
 build ainda copia `index.html` para `404.html`. Os atalhos do manifesto usam `#/zapear`, `#/favoritos` e `#/buscar`.
 
 `localStorage` (todas as leituras e escritas com `try/catch`): `tvlivre:favoritos`, `tvlivre:recentes`, `tvlivre:pais`,
-`tvlivre:ultimo`, `tvlivre:tema`, `tvlivre:mudo`, `tvlivre:volume` (0 a 100), `tvlivre:instalar-dispensado`, `tvlivre:dica-deslizar`, `tvlivre:http-liberado`, `tvlivre:modo-tv`, `tvlivre:modo-audio` (`normal` | `economico` | `radio`), `tvlivre:timer-padrao` (`15` | `30` | `60` | `90` | `fim`), `tvlivre:dica-dados` e `tvlivre:transmitindo`; em `sessionStorage` (só enquanto a aba existe): `tvlivre:controle-sessao` (computador), `tvlivre:controle-par` (celular) e `tvlivre:presenca-aba` (id aleatório da aba, nunca enviado); `tvlivre:presenca-teste` (em `localStorage`) só para desenvolvimento e testes; `tvlivre:remote-broker` só para desenvolvimento (só existe durante uma transmissão que o usuário começou).
+`tvlivre:ultimo`, `tvlivre:tema`, `tvlivre:mudo`, `tvlivre:volume` (0 a 100), `tvlivre:ocultar-fora`, `tvlivre:falhas` (canais que não abriram aqui, 7 dias), `tvlivre:instalar-dispensado`, `tvlivre:dica-deslizar`, `tvlivre:http-liberado`, `tvlivre:modo-tv`, `tvlivre:modo-audio` (`normal` | `economico` | `radio`), `tvlivre:timer-padrao` (`15` | `30` | `60` | `90` | `fim`), `tvlivre:dica-dados` e `tvlivre:transmitindo`; em `sessionStorage` (só enquanto a aba existe): `tvlivre:controle-sessao` (computador), `tvlivre:controle-par` (celular) e `tvlivre:presenca-aba` (id aleatório da aba, nunca enviado); `tvlivre:presenca-teste` (em `localStorage`) só para desenvolvimento e testes; `tvlivre:remote-broker` só para desenvolvimento (só existe durante uma transmissão que o usuário começou).
 
 ## Créditos e licenças
 

@@ -1,4 +1,4 @@
-import type { HealthEntry, HealthFile, Status, StreamKind } from '../../shared/types.ts';
+import type { Channel, HealthEntry, HealthFile, Status, StreamKind } from '../../shared/types.ts';
 import { shortHash } from './normalize.ts';
 
 export interface ProbeOptions {
@@ -33,6 +33,28 @@ export interface ProbeOutcome {
   cors?: boolean;
   /** Tipo real descoberto pelo conteúdo (ex.: https sem .m3u8 que na verdade é HLS). */
   kind?: StreamKind;
+  /** Tempo até os cabeçalhos da resposta, em ms (só quando houve resposta). */
+  latencyMs?: number;
+  /** Altura da maior variante anunciada (lista mestre HLS com RESOLUTION=), quando houver. */
+  height?: number;
+}
+
+/** Maior altura entre as variantes de uma lista mestre HLS (`RESOLUTION=1920x1080`), ou undefined. */
+export function maxHeight(playlist: string): number | undefined {
+  let max = 0;
+  for (const m of playlist.matchAll(/#EXT-X-STREAM-INF:[^\n]*?RESOLUTION=(\d{2,5})x(\d{2,5})/gi)) {
+    const h = Number(m[2]);
+    if (h > max && h <= 4320) max = h;
+  }
+  return max || undefined;
+}
+
+/** "1080p" a partir da altura; alturas fora do padrão (ex.: 404) arredondam para a faixa comum mais próxima abaixo. */
+export function resolutionLabel(height: number | undefined): string | undefined {
+  if (!height) return undefined;
+  const steps = [2160, 1440, 1080, 720, 576, 480, 360, 240];
+  const s = steps.find((x) => height >= x * 0.95);
+  return s ? `${s}p` : `${height}p`;
 }
 
 const DEAD_CODES = new Set([
@@ -88,27 +110,32 @@ export async function probeUrl(t: ProbeTarget, opts: ProbeOptions = DEFAULT_PROB
     };
     if (t.headers?.referrer) headers['referer'] = t.headers.referrer;
 
+    const t0 = performance.now();
     const res = await fetch(t.url, { headers, redirect: 'follow', signal: AbortSignal.timeout(opts.timeoutMs) });
+    const latencyMs = Math.max(1, Math.round(performance.now() - t0));
     const cors = corsAllowed(res, opts.siteOrigin);
 
     if (res.status === 404 || res.status === 410) {
       res.body?.cancel().catch(() => undefined);
-      return { ok: false, definitive: true, reason: `HTTP ${res.status}`, cors };
+      return { ok: false, definitive: true, reason: `HTTP ${res.status}`, cors, latencyMs };
     }
     if (!res.ok) {
       res.body?.cancel().catch(() => undefined);
       // 401/403/451 costumam ser bloqueio geográfico ou de cabeçalho; 429/5xx, instabilidade.
-      return { ok: false, definitive: false, reason: `HTTP ${res.status}`, cors };
+      return { ok: false, definitive: false, reason: `HTTP ${res.status}`, cors, latencyMs };
     }
 
     const ctype = (res.headers.get('content-type') ?? '').toLowerCase();
     const head = (await readHead(res)).replace(/^\uFEFF/, '').trimStart();
 
-    if (head.startsWith('#EXTM3U')) return { ok: true, definitive: false, reason: 'HLS ok', cors, kind: t.kind === 'other' ? 'hls' : t.kind };
-    if (head.startsWith('<MPD') || head.includes('<MPD ')) return { ok: true, definitive: false, reason: 'DASH ok', cors };
+    if (head.startsWith('#EXTM3U')) {
+      const height = maxHeight(head);
+      return { ok: true, definitive: false, reason: 'HLS ok', cors, kind: t.kind === 'other' ? 'hls' : t.kind, latencyMs, ...(height ? { height } : {}) };
+    }
+    if (head.startsWith('<MPD') || head.includes('<MPD ')) return { ok: true, definitive: false, reason: 'DASH ok', cors, latencyMs };
     const isMedia = /^(video|audio)\//.test(ctype) || ctype === 'application/octet-stream';
-    if (isMedia && t.kind !== 'hls') return { ok: true, definitive: false, reason: `mídia ${ctype}`, cors };
-    return { ok: false, definitive: false, reason: `conteúdo inesperado (${ctype || 'sem tipo'})`, cors };
+    if (isMedia && t.kind !== 'hls') return { ok: true, definitive: false, reason: `mídia ${ctype}`, cors, latencyMs };
+    return { ok: false, definitive: false, reason: `conteúdo inesperado (${ctype || 'sem tipo'})`, cors, latencyMs };
   } catch (err) {
     const code = errorCode(err);
     return { ok: false, definitive: DEAD_CODES.has(code), reason: code };
@@ -147,6 +174,23 @@ export interface Judged {
   status: Status;
   fails: number;
   cors?: boolean;
+  /** Medidas do último teste com resposta (as de um teste anterior são mantidas se este não respondeu). */
+  latencyMs?: number;
+  height?: number;
+  /** Link HTTP que respondeu também por HTTPS com CORS (preenchido por quem testa a versão HTTPS). */
+  httpsOk?: boolean;
+}
+
+/** Reconstrói o julgamento a partir de uma entrada do histórico (reaproveitada sem novo teste). */
+export function fromHealthEntry(e: HealthEntry): Judged {
+  return {
+    status: statusFromCode(e[0]),
+    fails: e[1],
+    cors: corsFromCode(e[3]),
+    ...(e[4] ? { latencyMs: e[4] } : {}),
+    ...(e[5] ? { height: e[5] } : {}),
+    ...(e[6] === 1 ? { httpsOk: true } : {}),
+  };
 }
 
 /**
@@ -158,13 +202,17 @@ export interface Judged {
  *    só vira offline depois de 3 falhas seguidas.
  */
 export function judge(outcome: ProbeOutcome, prev: HealthEntry | undefined): Judged {
-  if (outcome.ok) return { status: 'online', fails: 0, cors: outcome.cors };
+  if (outcome.ok) {
+    return { status: 'online', fails: 0, cors: outcome.cors, ...(outcome.latencyMs ? { latencyMs: outcome.latencyMs } : {}), ...(outcome.height ? { height: outcome.height } : {}) };
+  }
   const fails = (prev?.[1] ?? 0) + 1;
   const wasOnline = prev?.[0] === 0;
   let status: Status;
   if (outcome.definitive) status = wasOnline && fails < 2 ? 'desconhecido' : 'offline';
   else status = fails >= 3 ? 'offline' : 'desconhecido';
-  return { status, fails, cors: outcome.cors };
+  // sem sucesso agora: a resolução conhecida continua valendo (o canal é o mesmo); a latência é a deste teste, se respondeu
+  const height = prev?.[5] || undefined;
+  return { status, fails, cors: outcome.cors, ...(outcome.latencyMs ? { latencyMs: outcome.latencyMs } : {}), ...(height ? { height } : {}) };
 }
 
 // ---------- execução em lote ----------
@@ -238,7 +286,19 @@ export async function probeBatch(
 }
 
 export function toHealthEntry(j: Judged, nowMs = Date.now()): HealthEntry {
-  return [STATUS_CODE[j.status], j.fails, Math.floor(nowMs / 60_000), CORS_CODE(j.cors)];
+  return [STATUS_CODE[j.status], j.fails, Math.floor(nowMs / 60_000), CORS_CODE(j.cors), j.latencyMs ?? 0, j.height ?? 0, j.httpsOk ? 1 : 0];
+}
+
+/** Campos de saúde que vão para o canal publicado (só os que têm valor, para enxugar o JSON). */
+export function healthFields(j: Judged, checkedMinutes: number | undefined): Pick<Channel, 'fails' | 'checked' | 'latency' | 'resolution' | 'httpsOk'> {
+  const resolution = resolutionLabel(j.height);
+  return {
+    ...(j.fails > 0 ? { fails: j.fails } : {}),
+    ...(checkedMinutes ? { checked: checkedMinutes } : {}),
+    ...(j.latencyMs ? { latency: j.latencyMs } : {}),
+    ...(resolution ? { resolution } : {}),
+    ...(j.httpsOk ? { httpsOk: true as const } : {}),
+  };
 }
 
 export type { HealthFile };

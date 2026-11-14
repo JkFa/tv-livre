@@ -120,7 +120,7 @@ export function ChannelList({ channels, numbers, selectedKey, showCountry, isFav
                     </span>
                   )}
                   <span className="row-meta">
-                    <StatusMark status={ch.status} withText />
+                    <StatusMark channel={ch} withText />
                     {sub && <span className="row-sub">{sub}</span>}
                     <ChannelBadges channel={ch} />
                   </span>

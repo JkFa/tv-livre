@@ -195,7 +195,7 @@
 @keyframes pulse { 50% { opacity: 0.45; } }
 
 .status { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 700; color: var(--muted); flex: none; }
-.status-online { color: var(--text); }
+.status-ok { color: var(--text); }
 .status svg { flex: none; }
 .badges { display: inline-flex; gap: 6px; }
 .badge { font-size: 12px; font-weight: 700; padding: 1px 6px; border: 1px solid var(--rule); border-radius: var(--r-s); color: var(--muted); }
@@ -473,3 +473,7 @@ html[data-tv='on'] .controle-cod { font-size: 88px; }
   .workspace[data-mini='on'] .tv .player { height: auto; }
   .workspace[data-mini='on'] .tv .stage { flex: none; aspect-ratio: 16 / 9; }
 }
+
+/* ===== filtro de saúde: 5 opções; em 360 px os rótulos longos quebram em duas linhas em vez de estourar ===== */
+.seg-saude button { padding: 4px 6px; line-height: 1.15; font-size: 13px; }
+.field-note { margin-top: var(--s-2); font-size: 13px; line-height: 1.35; color: var(--muted); }

@@ -330,7 +330,7 @@ function Tile({ c, n, onTune, showCountry = false, star = false, prog, watching 
             </span>
           )}
           <span className="tile-meta">
-            <StatusMark status={c.status} withText={c.status !== 'online'} />
+            <StatusMark channel={c} withText={c.status !== 'online' || !!c.fails} />
             {star && <Star size={13} aria-hidden="true" className="tile-star" />}
             {meta && <span className="tile-sub">{meta}</span>}
           </span>

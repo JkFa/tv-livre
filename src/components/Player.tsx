@@ -19,6 +19,7 @@ import { useAirPlay, useRemotePlayback } from '../lib/transporte.ts';
 import { categoryLabel, countryFlag, countryName } from '../lib/labels.ts';
 import { CAUSAS_CAST, CAUSES, UNSUPPORTED, type UnsupportedWhy } from '../lib/messages.ts';
 import { getMuted, getVolume, markSwipeHintSeen, setMuted as saveMuted, setVolume as saveVolume, swipeHintSeen } from '../lib/prefs.ts';
+import { clearLocalFailure, recordLocalFailure } from '../lib/local-failures.ts';
 import { applySlider, sliderValue, toggleMuted, VOLUME_STEP, volumeIcon, volumeSettable, type Sound } from '../lib/volume.ts';
 import { caps, isPlayableHere, unsupportedReason, type Engine } from '../lib/playback.ts';
 import { isTvNow } from '../lib/tvmode.ts';
@@ -223,6 +224,16 @@ export function Player(props: Props) {
   }, [castOn, channelId, castable, castTentativa]);
 
   useEffect(() => onPlayingChange(playing && !paused), [playing, paused, onPlayingChange]);
+
+  // sinal local (só deste navegador, 7 dias): o canal não abriu → desce na lista na próxima sessão; tocou → sai do registro.
+  // Sem internet não é culpa do canal, então não conta.
+  const errCause = hlsActive && state.phase === 'error' ? state.cause : null;
+  const tocou = hlsActive && state.phase === 'playing';
+  useEffect(() => {
+    if (!channelId) return;
+    if (tocou) clearLocalFailure(channelId);
+    else if (errCause && errCause !== 'device' && online) recordLocalFailure(channelId);
+  }, [channelId, tocou, errCause, online]);
 
   // volume do usuário (celular ou teclado); o timer de desligar baixa o volume em cima dele e o restaura
   useEffect(() => {
@@ -767,7 +778,7 @@ export function Player(props: Props) {
           <p className="now-meta">
             <span>{countryFlagText(channel.country)}</span>
             {channel.categories[0] && <span>{categoryLabel(channel.categories[0])}</span>}
-            <StatusMark status={channel.status} withText />
+            <StatusMark channel={channel} withText />
             <ChannelBadges channel={channel} />
           </p>
           {mode === 'embed' && cast.suportado && (
