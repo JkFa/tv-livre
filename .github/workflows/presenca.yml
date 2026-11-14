@@ -55,6 +55,7 @@ jobs:
     steps:
       - name: Sem credenciais da Cloudflare
         if: env.CLOUDFLARE_API_TOKEN == '' || env.CLOUDFLARE_ACCOUNT_ID == ''
+        working-directory: . # (antes do checkout a pasta workers/presenca ainda não existe)
         run: |
           echo "::notice::CLOUDFLARE_API_TOKEN e CLOUDFLARE_ACCOUNT_ID não estão configurados: nada foi publicado (o site segue sem os números de presença)."
 
