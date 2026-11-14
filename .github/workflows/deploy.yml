@@ -80,6 +80,17 @@ jobs:
       - name: 'Testes de ponta a ponta (Playwright em Chromium e WebKit; Android, iPhone e desktop emulados)'
         run: npm run test:e2e
 
+      # Registros (trace, captura, contexto do erro) das tentativas que falharam, inclusive das que passaram na segunda
+      # tentativa: é o que permite investigar falhas raras do CI. Só os testes que falham deixam arquivos; sem falha, nada sobe.
+      - name: Registros dos testes que falharam
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-falhas
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+
       - uses: actions/configure-pages@v6
 
       - uses: actions/upload-pages-artifact@v5
