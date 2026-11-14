@@ -209,14 +209,27 @@ export default function App() {
     [baseList, filtros, deferredQuery, epgVersion, guideTick, maisAssistidos],
   );
 
-  const selected = useMemo(
+  const routeSelected = useMemo(
     () => (route.name === 'channel' ? (store[route.country]?.find((c) => c.id === route.id) ?? null) : null),
     [route, store],
   );
+  // ---- mini-player: quem sai do canal com o vídeo TOCANDO continua assistindo. O canal fica "ancorado" e o mesmo <Player>
+  // (o mesmo <video>) segue montado: na grade (#/canais) ele continua no lugar; nas outras telas vira uma janela fixa.
+  // Não vale no Modo TV nem transmitindo para a TV (lá sair do canal continua como antes).
+  const [docked, setDocked] = useState<Channel | null>(null);
+  const [prevRouteSelected, setPrevRouteSelected] = useState<Channel | null>(null);
+  if (routeSelected !== prevRouteSelected) {
+    setPrevRouteSelected(routeSelected);
+    if (routeSelected) setDocked(routeSelected);
+    else setDocked(route.name !== 'channel' && armed && playing && !tv && !cast.conectado ? prevRouteSelected : null);
+  }
+  const selected = routeSelected ?? (route.name !== 'channel' && !tv ? docked : null);
   const selectedKey = selected ? channelKey(selected) : null;
+  const isWorkspace = !isHome && !isDoc;
+  const miniOn = !isWorkspace && !!selected;
 
-  // "assistindo agora": só conta com um canal na tela E o vídeo realmente tocando (pausa, erro e sair do player = navegando)
-  const assistindoId = route.name === 'channel' && selected && playing ? selected.id : null;
+  // "assistindo agora": só conta com um canal na tela (ou no mini-player) E o vídeo realmente tocando (pausa, erro e sair do player = navegando)
+  const assistindoId = selected && playing ? selected.id : null;
   const assistindoPais = selected?.country ?? '';
   useEffect(() => {
     definirAssistindo(assistindoId ? { c: assistindoId, p: assistindoPais } : null);
@@ -576,7 +589,7 @@ export default function App() {
   );
 
   return (
-    <div className="app" data-doc={isDoc ? '' : undefined}>
+    <div className="app" data-doc={isDoc ? '' : undefined} data-mini={miniOn ? 'on' : undefined}>
       <header className="topbar">
         <a className="brand" href="#/" aria-label="TV Livre, início">
           <Mark size={30} />
@@ -672,9 +685,13 @@ export default function App() {
             onTv={() => changeTvPref('ligado')}
           />
         </>
-      ) : (
-        <main className="workspace" id="conteudo">
-          <section className="tv" aria-label="Televisão">
+      ) : null}
+
+      {/* O player mora SEMPRE neste mesmo lugar da árvore: trocar de tela não o desmonta (o stream não reinicia) e nunca há dois.
+          Fora da grade ele só existe se há um canal ancorado, e aí o CSS o transforma no mini-player (data-mini). */}
+      {index && !loadError && (isWorkspace || miniOn) && (
+        <div className="workspace" id={isWorkspace ? 'conteudo' : undefined} role={isWorkspace ? 'main' : undefined} data-mini={miniOn ? 'on' : undefined}>
+          <section className="tv" aria-label={miniOn ? 'Mini-player' : 'Televisão'}>
             {selectedMissing ? (
               <div className="player">
                 <div className="stage stage-idle" data-phase="idle">
@@ -714,11 +731,15 @@ export default function App() {
                 onMidia={setMidia}
                 modo={modo}
                 onModo={changeModo}
+                mini={miniOn}
+                onExpand={() => selected && navigate(channelHref(selected.country, selected.id))}
+                onClose={() => setDocked(null)}
               />
             )}
-            {iosBar}
+            {isWorkspace && iosBar}
           </section>
 
+          {isWorkspace && (
           <aside className="grade" aria-label="Grade de canais" inert={tv && !guideShown} data-open={guideShown ? 'true' : undefined}>
             <div className="grade-head">
               <div className="seg seg-tabs" role="tablist" aria-label="Lista">
@@ -827,7 +848,8 @@ export default function App() {
               </footer>
             )}
           </aside>
-        </main>
+          )}
+        </div>
       )}
 
       {saidaVisivel && (

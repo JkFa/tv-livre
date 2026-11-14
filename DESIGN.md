@@ -63,6 +63,8 @@ Ambas OFL, autohospedadas, subset latino, `font-display: swap` com fallback ajus
 |---|---|
 | **Grade (`Lineup`)** | Virtualizada. Linha de 60 px: número condensado (30 px), nome, subtítulo (categoria · país), status. Canal sintonizado = bloco de número preenchido com o acento. Régua de 1 px, sem cartões. |
 | **Player** | 16:9, sempre visível. Estados: espera (tela de ajuste), conectando, no ar, reconectando, erro, incompatível, embed. Controles próprios (sem `controls` nativo) para não brigar com os gestos. |
+| **Volume** | Botão de som + controle deslizante nativo (`<input type="range">`, 0–100) na barra de controles, na cor do texto do palco (o acento fica reservado). Alvo de 44 px de altura, foco visível. |
+| **Mini-player** | O próprio player reduzido: bloco escuro como o palco, borda sólida (sem sombra), imagem + número e nome + tocar/pausar, som, expandir, fechar (44 px). Celular: faixa de ~86 px acima da navegação inferior; ≥ 600 px: janela de 340 px no canto inferior direito. Aparece e some sem animação. |
 | **Vinheta (OSD)** | Bloco sólido (sem vidro) no canto: número enorme + nome. Entra por `transform` em 160 ms, some em ~2,4 s. Digitar números mostra o que foi digitado. |
 | **Dial** | Faixa "‹ 06 · **07 Nome** · 08 ›" abaixo do player: o controle remoto. Alvos de 56 px. |
 | **Navegação inferior** | Início · Canais · **Zapear** (central, acento) · Buscar · Mais. Só abaixo de 960 px. |
