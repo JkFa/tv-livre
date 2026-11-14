@@ -25,7 +25,11 @@ async function injetar(page: Page) {
   await page.route(`${HOST}/**`, deadStream);
 }
 const linha = (page: Page, nome: string) => page.getByTestId('channel-row').filter({ hasText: nome });
-const ordem = (page: Page) => page.getByTestId('channel-row').locator('.row-name').allTextContents();
+/** Ordem dos canais de teste na grade, lida só depois de a busca mostrar todos (allTextContents não espera nada). */
+async function ordem(page: Page): Promise<string[]> {
+  await expect(page.getByTestId('channel-row')).toHaveCount(TODOS.length);
+  return page.getByTestId('channel-row').locator('.row-name').allTextContents();
+}
 
 test('selos: no ar, instável e fora do ar por forma e texto; qualidade; "não toca no navegador" para HTTP', async ({ page }) => {
   await injetar(page);
@@ -95,7 +99,7 @@ test('canal que não abriu neste navegador: selo na hora, desce na lista na pró
   await expect(linha(page, QUEBRA.name).getByTestId('selo-falhou-aqui')).toBeVisible();
   await search(page, 'Zeta Saude');
   // a ordem desta sessão não muda sob o dedo do usuário…
-  expect(await ordem(page)).toEqual(antes);
+  await expect.poll(() => ordem(page)).toEqual(antes);
   // …na próxima, ele fica abaixo dos instáveis e acima dos fora do ar
   await page.goto('./#/canais');
   await page.reload();
