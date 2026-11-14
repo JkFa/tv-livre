@@ -5,7 +5,7 @@
  * Só enviamos o namespace e a chave do contador — nenhum dado pessoal. Com o serviço de presença configurado, uma visita
  * que falhar NÃO é repetida no Abacus (o serviço novo já partiu do total do Abacus: contar nos dois duplicaria).
  */
-import { presencaBase, presencaTeste } from './presenca-url.ts';
+import { presencaAtiva, presencaBase, presencaTeste } from './presenca-url.ts';
 
 export const COUNTER_BASE = 'https://abacus.jasoncameron.dev';
 export const COUNTER_NS = 'tvlivre-jkfa';
@@ -94,10 +94,14 @@ export async function registerVisit(count: boolean = shouldCount(), fetchFn: typ
   return total;
 }
 
-/** Lê o total sem incrementar (usado na página Sobre). */
-export async function readTotal(fetchFn: typeof fetch = fetch): Promise<number | null> {
+/**
+ * Lê o total sem incrementar (usado na página Sobre e fora do site publicado).
+ * O serviço de presença só é consultado onde ele vale (`presencaAtiva`: site publicado sem automação, ou o modo de teste):
+ * em localhost, prévias e E2E ele recusa a origem (CORS), o WebKit registra isso como erro da página e o teste sairia para a internet.
+ */
+export async function readTotal(fetchFn: typeof fetch = fetch, comPresenca: boolean = presencaAtiva()): Promise<number | null> {
   if (lastTotal !== null) return lastTotal;
-  const base = presencaBase();
+  const base = comPresenca ? presencaBase() : null;
   const n = (base ? await chamarPresenca(base, 'resumo', fetchFn) : null) ?? (await call('get', fetchFn));
   if (n !== null) lastTotal = n;
   return n;
